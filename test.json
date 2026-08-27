@@ -1,0 +1,13 @@
+{
+    "total": [
+        {
+            "amount" : {
+                "cents": 100
+            },
+            "month": "January",
+            "year": 2026
+        }
+    ],
+    "income": [],
+    "expenses": []
+}
