@@ -2,7 +2,7 @@ use std::fs;
 
 use chrono::{Month, NaiveDate};
 
-use crate::money::{Category, Money, MoneyChange, MoneyList, Sign, Tracker, YearMonth};
+use crate::money::{Category, Money, MoneyChange, MoneyList, Tracker, YearMonth};
 
 pub fn load_file(filename: &str) -> Result<Tracker, String> {
     let json = fs::read_to_string(filename).map_err(|e| e.to_string())?;
@@ -46,17 +46,11 @@ impl SerialTracker {
                 month: ym_entry.month,
             };
             for entry in &ym_entry.entries {
-                let (cents, sign) = if entry.amount < 0 {
-                    (-entry.amount as u64, Sign::Negative)
-                } else {
-                    (entry.amount as u64, Sign::Positive)
-                };
-                let amount = Money { cents };
+                let amount = Money { cents: entry.amount };
                 list.add_entry(
                     ym,
                     MoneyChange {
                         amount,
-                        sign,
                         category: entry.category,
                         date: entry.date,
                     },

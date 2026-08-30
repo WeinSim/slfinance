@@ -4,12 +4,13 @@ Usage:
 Without <command>, slfinance is started in interactive mode.
 
 Commands:
-    list                Lists information about loaded file.
-    help                Prints this help message.
-    version             Prints version and copyright information.
-    exit                Quits the program.
+    list                    Lists information about loaded file.
+    help                    Prints this help message.
+    version                 Prints version and copyright information.
+    exit                    Quits the program.
 
 Options:
-    --help, -h          Prints this help message.
-    --version, -v       Prints version and copyright information.
-    --file, -f <file>   Opens the specified file.
+    --help, -h              Prints this help message.
+    --version, -v           Prints version and copyright information.
+    --file, -f <file>       Opens the specified file.
+    --show-categories, -c   Shows each category in a separate column.

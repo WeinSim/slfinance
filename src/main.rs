@@ -70,6 +70,7 @@ fn process_input(input: &[String], app_state: &mut AppState) -> bool {
                 // should never happen
                 panic!("Error: detected command in non-command arg list");
             }
+            _ => {}
         }
     }
     if let Some(filename) = filename {

@@ -1,6 +1,7 @@
 use std::{
+    cmp::Ordering,
     collections::HashMap,
-    fmt::{Display, Formatter},
+    fmt::{Display, Formatter, Write},
     iter::Sum,
     ops::{Add, AddAssign, Sub, SubAssign},
 };
@@ -49,7 +50,7 @@ impl MoneyList {
     }
 
     pub fn add_entry(&mut self, year_month: YearMonth, entry: MoneyChange) -> Result<(), String> {
-        if !self.allow_negatives && entry.sign == Sign::Negative {
+        if !self.allow_negatives && entry.amount.is_negative() {
             return Err("A 'total' value cannot be negative".to_owned());
         }
         if !self.allow_dates && entry.date.is_some() {
@@ -72,8 +73,18 @@ impl MoneyList {
     pub fn sum(&self, year_month: &YearMonth) -> Money {
         self.entries
             .get(year_month)
-            .and_then(|v| Some(v.iter().map(|mc| mc.amount).sum()))
-            .unwrap_or_default()
+            .map_or_default(|v| v.iter().map(|mc| mc.amount).sum())
+    }
+
+    pub fn sum_category(&self, year_month: &YearMonth, category: usize) -> Money {
+        let Some(entries) = self.entries.get(year_month) else {
+            return Money::default();
+        };
+        entries
+            .iter()
+            .filter(|e| e.category.is_some_and(|i| i == category))
+            .map(|mc| mc.amount)
+            .sum()
     }
 
     pub fn add_category(&mut self, category: Category) {
@@ -85,7 +96,9 @@ impl MoneyList {
     }
 
     pub fn get_year_months(&self) -> Vec<YearMonth> {
-        self.entries.keys().copied().collect()
+        let mut vec: Vec<YearMonth> = self.entries.keys().copied().collect();
+        vec.sort();
+        vec
     }
 }
 
@@ -95,21 +108,56 @@ pub struct YearMonth {
     pub month: Month,
 }
 
+impl Ord for YearMonth {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.year.partial_cmp(&other.year) {
+            Some(Ordering::Equal) | None => {}
+            Some(o) => {
+                return o;
+            }
+        }
+        self.month.cmp(&other.month)
+    }
+}
+
+impl PartialOrd for YearMonth {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 pub struct MoneyChange {
     pub amount: Money,
-    pub sign: Sign,
     pub date: Option<NaiveDate>,
     pub category: Option<usize>,
 }
 
 #[derive(Clone, Copy)]
 pub struct Money {
-    pub cents: u64,
+    pub cents: i64,
+}
+
+impl Money {
+    pub fn is_negative(&self) -> bool {
+        self.cents < 0
+    }
 }
 
 impl Default for Money {
     fn default() -> Self {
         Self { cents: 0 }
+    }
+}
+
+impl PartialEq for Money {
+    fn eq(&self, other: &Self) -> bool {
+        self.cents == other.cents
+    }
+}
+
+impl PartialOrd for Money {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.cents.partial_cmp(&other.cents)
     }
 }
 
@@ -151,24 +199,45 @@ impl Sum<Money> for Money {
     }
 }
 
+// The following format arguments are considered:
+// width, fill, alignment, sign (+) and alternate(#)
+// With the alternate flag (#), groups of 3 digits are separated by commas
+// (e.g. 1,234.45€)
 impl Display for Money {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let major = self.cents / 100;
         let minor = self.cents % 100;
-        match f.width() {
-            Some(width) => {
-                let major_width = width - 4;
-                write!(f, "{major:major_width$}.{minor:02}€")
+        let mut major_str = major.to_string();
+        // split groups of 3 digits with commas
+        if f.alternate() {
+            let mut buf = String::new();
+            let mut start: usize = 0;
+            let mut end: usize = match major_str.len() % 3 {
+                0 => 3,
+                i => i,
+            };
+            loop {
+                buf.push_str(&major_str[start..end]);
+                if end < major_str.len() - 1 {
+                    buf.push(',');
+                } else {
+                    break;
+                }
+                start = end;
+                end = start + 3;
             }
-            None => write!(f, "{major}.{minor:02}€"),
+            major_str = buf;
         }
+        let mut base_str = String::new();
+        if f.sign_plus() {
+            base_str.push(if self.is_negative() { '-' } else { '+' });
+        }
+        base_str.push_str(&major_str);
+        write!(&mut base_str, ".{minor:02}€")?;
+        // let align = f.align().unwrap_or(Alignment::Right);
+        // this should automatically account for width, fill and alignment.
+        f.pad(&base_str)
     }
-}
-
-#[derive(PartialEq, Eq)]
-pub enum Sign {
-    Positive = 1,
-    Negative = -1,
 }
 
 pub struct Category {
