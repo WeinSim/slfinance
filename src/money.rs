@@ -8,64 +8,84 @@ use std::{
 use chrono::{Month, NaiveDate};
 
 pub struct Tracker {
-    total: HashMap<YearMonth, Vec<MoneySnapshot>>,
-    total_categories: Vec<Category>,
-    income: HashMap<YearMonth, Vec<MoneyChange>>,
-    income_categories: Vec<Category>,
-    expenses: HashMap<YearMonth, Vec<MoneyChange>>,
-    expenses_categories: Vec<Category>,
+    pub total: MoneyList,
+    pub incomes: MoneyList,
+    pub expenses: MoneyList,
 }
 
 impl Tracker {
     pub fn new() -> Self {
         Self {
-            total: HashMap::new(),
-            total_categories: Vec::new(),
-            income: HashMap::new(),
-            income_categories: Vec::new(),
-            expenses: HashMap::new(),
-            expenses_categories: Vec::new(),
-        }
-    }
-
-    pub fn add_total(&mut self, year_month: YearMonth, snapshot: MoneySnapshot) {
-        let vec_opt = self.total.get_mut(&year_month);
-        let vec = match vec_opt {
-            Some(v) => v,
-            None => {
-                self.total.insert(year_month, Vec::new());
-                self.total.get_mut(&year_month).expect("map should contain the newly inserted vector")
-            }
-        };
-        vec.push(snapshot);
-    }
-
-    pub fn add_total_category(&mut self, category: Category) {
-        self.total_categories.push(category);
-    }
-
-    pub fn get_num_total_categories(&self) -> usize {
-        self.total_categories.len()
-    }
-
-    pub fn get_total_sum(&self, year_month: &YearMonth) -> Money {
-        match self.total.get(year_month) {
-            Some(v) => v.iter().map(|ms| ms.amount).sum(),
-            None => Money::default(),
+            total: MoneyList::new(false, false),
+            incomes: MoneyList::new(true, true),
+            expenses: MoneyList::new(true, true),
         }
     }
 
     pub fn get_year_months(&self) -> Vec<YearMonth> {
-        self.total
-            .keys()
-            .chain(self.income.keys())
-            .chain(self.expenses.keys())
-            .copied()
-            .collect()
+        let mut vec: Vec<YearMonth> = vec![];
+        vec.append(&mut self.total.get_year_months());
+        vec.append(&mut self.incomes.get_year_months());
+        vec.append(&mut self.expenses.get_year_months());
+        vec
+    }
+}
+
+pub struct MoneyList {
+    entries: HashMap<YearMonth, Vec<MoneyChange>>,
+    categories: Vec<Category>,
+    allow_negatives: bool,
+    allow_dates: bool,
+}
+
+impl MoneyList {
+    fn new(allow_negatives: bool, allow_dates: bool) -> Self {
+        Self {
+            entries: HashMap::new(),
+            categories: Vec::new(),
+            allow_negatives,
+            allow_dates,
+        }
     }
 
-    pub fn total_categories(&self) -> &Vec<Category> {
-        &self.total_categories
+    pub fn add_entry(&mut self, year_month: YearMonth, entry: MoneyChange) -> Result<(), String> {
+        if !self.allow_negatives && entry.sign == Sign::Negative {
+            return Err("A 'total' value cannot be negative".to_owned());
+        }
+        if !self.allow_dates && entry.date.is_some() {
+            return Err("A 'total' entry cannot have a date associated with it".to_owned());
+        }
+        match entry.category {
+            Some(i) if i >= self.categories.len() => {
+                return Err(format!(
+                    "Index out of range (index={}, len={}",
+                    i,
+                    self.categories.len(),
+                ));
+            }
+            _ => {}
+        }
+        self.entries.entry(year_month).or_default().push(entry);
+        Ok(())
+    }
+
+    pub fn sum(&self, year_month: &YearMonth) -> Money {
+        self.entries
+            .get(year_month)
+            .and_then(|v| Some(v.iter().map(|mc| mc.amount).sum()))
+            .unwrap_or_default()
+    }
+
+    pub fn add_category(&mut self, category: Category) {
+        self.categories.push(category);
+    }
+
+    pub fn categories(&self) -> &Vec<Category> {
+        &self.categories
+    }
+
+    pub fn get_year_months(&self) -> Vec<YearMonth> {
+        self.entries.keys().copied().collect()
     }
 }
 
@@ -76,14 +96,9 @@ pub struct YearMonth {
 }
 
 pub struct MoneyChange {
-    amount: Money,
-    sign: Sign,
-    date: Option<NaiveDate>,
-    category: Option<usize>,
-}
-
-pub struct MoneySnapshot {
     pub amount: Money,
+    pub sign: Sign,
+    pub date: Option<NaiveDate>,
     pub category: Option<usize>,
 }
 
@@ -92,8 +107,8 @@ pub struct Money {
     pub cents: u64,
 }
 
-impl Money {
-    pub fn default() -> Self {
+impl Default for Money {
+    fn default() -> Self {
         Self { cents: 0 }
     }
 }
@@ -130,11 +145,9 @@ impl SubAssign<Money> for Money {
 
 impl Sum<Money> for Money {
     fn sum<I: Iterator<Item = Money>>(iter: I) -> Self {
-        let mut sum = Self::default();
-        for money in iter {
-            sum += money;
+        Self {
+            cents: iter.map(|m| m.cents).sum(),
         }
-        sum
     }
 }
 
@@ -152,6 +165,7 @@ impl Display for Money {
     }
 }
 
+#[derive(PartialEq, Eq)]
 pub enum Sign {
     Positive = 1,
     Negative = -1,

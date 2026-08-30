@@ -78,7 +78,7 @@ fn process_input(input: &[String], app_state: &mut AppState) -> bool {
                 app_state.tracker = Some(t);
             }
             Err(msg) => {
-                println!("{msg}");
+                println!("Unable to open file \"{filename}\": {msg}");
             }
         }
     }

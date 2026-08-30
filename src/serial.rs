@@ -2,7 +2,7 @@ use std::fs;
 
 use chrono::{Month, NaiveDate};
 
-use crate::money::{Category, Money, MoneySnapshot, Tracker, YearMonth};
+use crate::money::{Category, Money, MoneyChange, MoneyList, Sign, Tracker, YearMonth};
 
 pub fn load_file(filename: &str) -> Result<Tracker, String> {
     let json = fs::read_to_string(filename).map_err(|e| e.to_string())?;
@@ -15,38 +15,55 @@ pub fn load_file(filename: &str) -> Result<Tracker, String> {
 struct SerialTracker {
     total: Vec<YearMonthEntry>,
     total_categories: Vec<String>,
-    income: Vec<YearMonthEntry>,
+    incomes: Vec<YearMonthEntry>,
     income_categories: Vec<String>,
     expenses: Vec<YearMonthEntry>,
-    expenses_categories: Vec<String>,
+    expense_categories: Vec<String>,
 }
 
 impl SerialTracker {
     fn as_tracker(self) -> Result<Tracker, String> {
         let mut tracker = Tracker::new();
-        for cat in self.total_categories {
-            tracker.add_total_category(Category { name: cat });
+        Self::add_entries(&mut tracker.total, &self.total_categories, &self.total)?;
+        Self::add_entries(&mut tracker.incomes, &self.income_categories, &self.incomes)?;
+        Self::add_entries(&mut tracker.expenses, &self.expense_categories, &self.expenses)?;
+        Ok(tracker)
+    }
+
+    fn add_entries(
+        list: &mut MoneyList,
+        categories: &Vec<String>,
+        ym_entries: &Vec<YearMonthEntry>,
+    ) -> Result<(), String> {
+        for cat in categories {
+            list.add_category(Category {
+                name: cat.to_owned(),
+            });
         }
-        for ym_entry in self.total {
+        for ym_entry in ym_entries {
             let ym = YearMonth {
                 year: ym_entry.year,
                 month: ym_entry.month,
             };
-            for entry in ym_entry.entries {
-                if entry.amount < 0 {
-                    todo!("print error here")
-                }
-                let amount = Money {
-                    cents: entry.amount as u64,
+            for entry in &ym_entry.entries {
+                let (cents, sign) = if entry.amount < 0 {
+                    (-entry.amount as u64, Sign::Negative)
+                } else {
+                    (entry.amount as u64, Sign::Positive)
                 };
-                let category = match entry.category {
-                    Some(i) if i < tracker.get_num_total_categories() => Some(i),
-                    _ => None,
-                };
-                tracker.add_total(ym, MoneySnapshot { amount, category });
+                let amount = Money { cents };
+                list.add_entry(
+                    ym,
+                    MoneyChange {
+                        amount,
+                        sign,
+                        category: entry.category,
+                        date: entry.date,
+                    },
+                )?;
             }
         }
-        Ok(tracker)
+        Ok(())
     }
 }
 

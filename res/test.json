@@ -33,7 +33,7 @@
         "Cat1",
         "Cat2"
     ],
-    "income": [
+    "incomes": [
         {
             "month": "March",
             "year": 2026,
@@ -53,5 +53,5 @@
         "Cat income"
     ],
     "expenses": [],
-    "expenses_categories": []
+    "expense_categories": []
 }

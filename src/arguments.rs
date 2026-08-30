@@ -87,19 +87,29 @@ impl Command {
                         return;
                     }
                 };
-                let year_width: usize = 8;
+                let month_width: usize = 3;
+                let year_width: usize = 4;
                 let pad_left: usize = 2;
                 let pad: usize = 2;
                 let col_width: usize = 10;
                 println!(
-                    "{:year_width$}{:pad_left$}{:>col_width$}{:>pad$}{:>col_width$}{:>pad$}{:>col_width$}",
-                    "", "", "total", "", "income", "", "expenses"
+                    "{:month_width$} {:year_width$}{:pad_left$}{:>col_width$}{:pad$}{:>col_width$}{:pad$}{:>col_width$}",
+                    "", "", "", "total", "", "income", "", "expenses"
                 );
                 for year_month in tracker.get_year_months() {
                     let year = year_month.year;
                     let month = year_month.month;
-                    print!("{:3} {year:4}  ", &month.name()[..3]);
-                    print!("{:>col_width$}", tracker.get_total_sum(&year_month));
+                    print!(
+                        "{:month_width$} {:year_width$}{:pad_left$}{:>col_width$}{:pad$}{:>col_width$}{:pad$}{:>col_width$}",
+                        &month.name()[..3],
+                        year,
+                        "",
+                        tracker.total.sum(&year_month),
+                        "",
+                        tracker.incomes.sum(&year_month),
+                        "",
+                        tracker.expenses.sum(&year_month)
+                    );
                     println!();
                 }
             }
