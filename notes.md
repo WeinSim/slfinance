@@ -11,11 +11,11 @@
     - Modify data
     - Clear data
     - List data
-- Direct and interactive modes on command-line
 - File format to store data?
     - JSON?
     - Encrypted?
 - Settings file (~/.slfinance/settings.json) to automatically load most recent file
+- Add full support for all format options for Money
 - Export graphs
 
 ## Frontend

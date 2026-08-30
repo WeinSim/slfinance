@@ -5,37 +5,37 @@ use std::{
 };
 
 mod arguments;
-use chrono::Month;
-
+mod money;
+mod serial;
+mod sutil;
 use crate::{
     arguments::{ArgList, Argument},
     money::Tracker,
 };
 
-mod money;
-
 static CONFIG: LazyLock<Config> = LazyLock::new(init_config);
 
-const MONTHS: &[Month] = &[
-    Month::January,
-    Month::February,
-    Month::March,
-    Month::April,
-    Month::May,
-    Month::June,
-    Month::July,
-    Month::August,
-    Month::September,
-    Month::October,
-    Month::November,
-    Month::December,
-];
+// const MONTHS: &[Month] = &[
+//     Month::January,
+//     Month::February,
+//     Month::March,
+//     Month::April,
+//     Month::May,
+//     Month::June,
+//     Month::July,
+//     Month::August,
+//     Month::September,
+//     Month::October,
+//     Month::November,
+//     Month::December,
+// ];
 
 fn main() {
+    sutil::print_num_lines();
     // parse arguments
     // skip first argument ('slfinance')
-    let args = &std::env::args().collect::<Vec<String>>()[1..];
     let mut app_state: AppState = AppState::new();
+    let args = &std::env::args().collect::<Vec<String>>()[1..];
     if process_input(args, &mut app_state) {
         run_interactive(&mut app_state);
     }
@@ -72,8 +72,15 @@ fn process_input(input: &[String], app_state: &mut AppState) -> bool {
             }
         }
     }
-    if let Some(t) = filename.and_then(load_file) {
-        app_state.tracker = Some(t);
+    if let Some(filename) = filename {
+        match serial::load_file(filename) {
+            Ok(t) => {
+                app_state.tracker = Some(t);
+            }
+            Err(msg) => {
+                println!("{msg}");
+            }
+        }
     }
     if let Some(command) = arg_list.command() {
         command.run(arg_list.args(), app_state);
@@ -130,23 +137,6 @@ fn init_config() -> Config {
             .unwrap_or("[Unable to load help message]".to_owned()),
         version_message: fs::read_to_string("res/version.txt")
             .unwrap_or("[Unable to load version message]".to_owned()),
-    }
-}
-
-fn load_file(filename: &str) -> Option<Tracker> {
-    let json = match fs::read_to_string(filename) {
-        Ok(json) => json,
-        Err(e) => {
-            println!("{e}");
-            return None;
-        }
-    };
-    match serde_json::from_str(&json) {
-        Ok(tracker) => tracker,
-        Err(e) => {
-            println!("{e}");
-            None
-        }
     }
 }
 

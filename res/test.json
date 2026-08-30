@@ -1,0 +1,57 @@
+{
+    "total": [
+        {
+            "month": "January",
+            "year": 2026,
+            "entries": [
+                {
+                    "category": 0,
+                    "amount": 100
+                },
+                {
+                    "category": 1,
+                    "amount": 500
+                }
+            ]
+        },
+        {
+            "month": "February",
+            "year": 2026,
+            "entries": [
+                {
+                    "category": 0,
+                    "amount": 200
+                },
+                {
+                    "category": 0,
+                    "amount": 100
+                }
+            ]
+        }
+    ],
+    "total_categories": [
+        "Cat1",
+        "Cat2"
+    ],
+    "income": [
+        {
+            "month": "March",
+            "year": 2026,
+            "entries": [
+                {
+                    "category": 0,
+                    "amount": 2000
+                },
+                {
+                    "amount": 1000,
+                    "date": "2026-03-07"
+                }
+            ]
+        }
+    ],
+    "income_categories": [
+        "Cat income"
+    ],
+    "expenses": [],
+    "expenses_categories": []
+}

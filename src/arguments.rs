@@ -1,4 +1,4 @@
-use crate::{AppState, MONTHS};
+use crate::{AppState, print_help, print_version};
 
 pub struct ArgList {
     command: Option<Command>,
@@ -95,21 +95,25 @@ impl Command {
                     "{:year_width$}{:pad_left$}{:>col_width$}{:>pad$}{:>col_width$}{:>pad$}{:>col_width$}",
                     "", "", "total", "", "income", "", "expenses"
                 );
-                for year in tracker.get_years() {
-                    for month in MONTHS {
-                        print!("{:3} {year:4}  ", &month.name()[..3]);
-                        for total in &tracker.total {
-                            if total.year == year && &total.month == month {
-                                print!("{:>col_width$}", total.amount);
-                            }
-                        }
-                        println!();
-                    }
+                for year_month in tracker.get_year_months() {
+                    let year = year_month.year;
+                    let month = year_month.month;
+                    print!("{:3} {year:4}  ", &month.name()[..3]);
+                    print!("{:>col_width$}", tracker.get_total_sum(&year_month));
+                    println!();
                 }
             }
-            _ => {
-                println!("Command not yet implemented");
+            Self::Exit => {
+                std::process::exit(0);
             }
+            Self::Version => {
+                print_version();
+            }
+            Self::Help => {
+                print_help();
+            } // _ => {
+              //     println!("Command not yet implemented");
+              // },
         }
     }
 }
