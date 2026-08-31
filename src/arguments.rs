@@ -117,18 +117,40 @@ fn list(args: &[Argument], app_state: &mut AppState) {
     let mut cells: HashMap<YearMonth, Vec<Money>> = HashMap::new();
     let show_categories = args.iter().any(|a| matches!(a, Argument::ShowCategories));
     let year_months = tracker.get_year_months();
-    headers.push("Total");
-    list_prepare_data(&tracker.total, &mut headers, &mut cells, &year_months, show_categories);
-    headers.push("Incomes");
-    list_prepare_data(&tracker.incomes, &mut headers, &mut cells, &year_months, show_categories);
-    headers.push("Expenses");
-    list_prepare_data(&tracker.expenses, &mut headers, &mut cells, &year_months, show_categories);
+    // TODO continue: maybe make a table struct for easier insertion,
+    // calculate expected and actual changes from one month (and optionally year?)
+    list_prepare_data(
+        &tracker.total,
+        "Total",
+        &mut headers,
+        &mut cells,
+        &year_months,
+        show_categories,
+        true,
+    );
+    list_prepare_data(
+        &tracker.incomes,
+        "Incomes",
+        &mut headers,
+        &mut cells,
+        &year_months,
+        show_categories,
+        false,
+    );
+    list_prepare_data(
+        &tracker.expenses,
+        "Expenses",
+        &mut headers,
+        &mut cells,
+        &year_months,
+        show_categories,
+        false,
+    );
     let month_width: usize = 3;
     let year_width: usize = 4;
     let pad_left: usize = 2;
     let pad: usize = 2;
     let col_width: usize = 15;
-    // print!("\\[\\e[1;32m\\]");
     print!("{:month_width$} {:year_width$}{:pad_left$}", "", "", "");
     for (i, header) in headers.iter().enumerate() {
         if i < headers.len() - 1 {
@@ -159,23 +181,39 @@ fn list(args: &[Argument], app_state: &mut AppState) {
 
 fn list_prepare_data<'a>(
     money_list: &'a MoneyList,
+    name: &'a str,
     headers: &mut Vec<&'a str>,
     cells: &mut HashMap<YearMonth, Vec<Money>>,
     year_months: &Vec<YearMonth>,
     show_categories: bool,
+    sum_last: bool,
 ) {
+    // headers
+    if !sum_last {
+        headers.push(name);
+    }
     if show_categories {
         for category in money_list.categories() {
             headers.push(&category.name);
         }
     }
+    if sum_last {
+        headers.push(name);
+    }
+    // cells
     for year_month in year_months {
         let row = cells.entry(*year_month).or_default();
-        row.push(money_list.sum(&year_month));
+        let sum = money_list.sum(&year_month);
+        if !sum_last {
+            row.push(sum);
+        }
         if show_categories {
             for i in 0..money_list.categories().len() {
                 row.push(money_list.sum_category(&year_month, i));
             }
+        }
+        if sum_last {
+            row.push(sum);
         }
     }
 }

@@ -24,10 +24,12 @@ impl Tracker {
     }
 
     pub fn get_year_months(&self) -> Vec<YearMonth> {
-        let mut vec: Vec<YearMonth> = vec![];
+        let mut vec: Vec<YearMonth> = Vec::new();
         vec.append(&mut self.total.get_year_months());
         vec.append(&mut self.incomes.get_year_months());
         vec.append(&mut self.expenses.get_year_months());
+        vec.sort();
+        vec.dedup();
         vec
     }
 }
@@ -102,7 +104,7 @@ impl MoneyList {
     }
 }
 
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub struct YearMonth {
     pub year: i32,
     pub month: Month,

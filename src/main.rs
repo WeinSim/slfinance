@@ -8,6 +8,7 @@ mod arguments;
 mod money;
 mod serial;
 mod sutil;
+
 use crate::{
     arguments::{ArgList, Argument},
     money::Tracker,

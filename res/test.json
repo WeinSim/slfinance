@@ -53,6 +53,16 @@
     "income_categories": [
         "Cat income"
     ],
-    "expenses": [],
+    "expenses": [
+        {
+            "month": "February",
+            "year": 2026,
+            "entries": [
+                {
+                    "amount": 500
+                }
+            ]
+        }
+    ],
     "expense_categories": []
 }
