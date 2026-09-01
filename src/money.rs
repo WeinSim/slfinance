@@ -23,6 +23,18 @@ impl Tracker {
         }
     }
 
+    pub fn get_total_change(&self, year_month: &YearMonth) -> Money {
+        self.total.sum(&year_month.succ()) - self.total.sum(year_month)
+    }
+
+    pub fn get_expected_total_change(&self, year_month: &YearMonth) -> Money {
+        self.incomes.sum(year_month) - self.expenses.sum(year_month)
+    }
+
+    pub fn get_diff_total_change(&self, year_month: &YearMonth) -> Money {
+        self.get_total_change(year_month) - self.get_expected_total_change(year_month)
+    }
+
     pub fn get_year_months(&self) -> Vec<YearMonth> {
         let mut vec: Vec<YearMonth> = Vec::new();
         vec.append(&mut self.total.get_year_months());
@@ -108,6 +120,19 @@ impl MoneyList {
 pub struct YearMonth {
     pub year: i32,
     pub month: Month,
+}
+
+impl YearMonth {
+    pub fn succ(&self) -> Self {
+        Self {
+            year: if self.month == Month::December {
+                self.year + 1
+            } else {
+                self.year
+            },
+            month: self.month.succ(),
+        }
+    }
 }
 
 impl Ord for YearMonth {
