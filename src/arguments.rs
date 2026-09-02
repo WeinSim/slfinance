@@ -1,4 +1,6 @@
+use owo_colors::OwoColorize;
 use std::collections::HashMap;
+use std::fmt::Write;
 
 use crate::{
     AppState,
@@ -118,9 +120,9 @@ fn list(args: &[Argument], app_state: &mut AppState) {
     let mut table = Table::new(&year_months);
     table.insert_money_list(&tracker.total, "Total", show_categories, true);
     // table.add_separator();
-    table.add_column("Change", |ym| tracker.get_total_change(ym));
-    table.add_column("Diff", |ym| tracker.get_diff_total_change(ym));
-    table.add_column("Expected", |ym| tracker.get_expected_total_change(ym));
+    table.add_column("Change", true, |ym| tracker.get_total_change(ym), true);
+    table.add_column("Diff", true, |ym| tracker.get_diff_total_change(ym), true);
+    table.add_column("Expected", true, |ym| tracker.get_expected_total_change(ym), true);
     table.insert_money_list(&tracker.incomes, "Incomes", show_categories, false);
     table.insert_money_list(&tracker.expenses, "Expenses", show_categories, false);
     let month_width: usize = 3;
@@ -132,9 +134,29 @@ fn list(args: &[Argument], app_state: &mut AppState) {
 }
 
 struct Table<'a> {
-    headers: Vec<&'a str>,
-    cells: HashMap<YearMonth, Vec<Money>>,
+    headers: Vec<Header<'a>>,
+    cells: HashMap<YearMonth, Vec<Cell>>,
     year_months: &'a Vec<YearMonth>,
+}
+
+struct Header<'a> {
+    name: &'a str,
+    bold: bool,
+}
+
+struct Cell {
+    money: Money,
+    color: bool,
+}
+
+impl Header<'_> {
+    fn print(&self, col_width: usize) {
+        if self.bold {
+            print!("{:>col_width$}", self.name.bold());
+        } else {
+            print!("{:>col_width$}", self.name);
+        }
+    }
 }
 
 impl<'a> Table<'a> {
@@ -146,16 +168,16 @@ impl<'a> Table<'a> {
         }
     }
 
-    fn add_column<F>(&mut self, name: &'a str, entries: F)
+    fn add_column<F>(&mut self, name: &'a str, bold: bool, entries: F, color: bool)
     where
         F: Fn(&YearMonth) -> Money,
     {
-        self.headers.push(name);
+        self.headers.push(Header { name, bold });
         for year_month in self.year_months {
-            self.cells
-                .entry(*year_month)
-                .or_default()
-                .push(entries(year_month));
+            self.cells.entry(*year_month).or_default().push(Cell {
+                money: entries(year_month),
+                color,
+            });
         }
     }
 
@@ -168,15 +190,15 @@ impl<'a> Table<'a> {
     ) {
         // headers
         if !sum_last {
-            self.add_column(name, |ym| money_list.sum(ym));
+            self.add_column(name, true, |ym| money_list.sum(ym), false);
         }
         if show_categories {
             for (i, category) in money_list.categories().iter().enumerate() {
-                self.add_column(&category.name, |ym| money_list.sum_category(ym, i));
+                self.add_column(&category.name, false, |ym| money_list.sum_category(ym, i), false);
             }
         }
         if sum_last {
-            self.add_column(name, |ym| money_list.sum(ym));
+            self.add_column(name, true, |ym| money_list.sum(ym), false);
         }
     }
 
@@ -190,12 +212,12 @@ impl<'a> Table<'a> {
     ) {
         print!("{:month_width$} {:year_width$}{:pad_left$}", "", "", "");
         for (i, header) in self.headers.iter().enumerate() {
+            header.print(col_width);
             if i < self.headers.len() - 1 {
-                print!("{:>col_width$}{:pad$}", header, "");
-            } else {
-                println!("{:>col_width$}", header);
+                print!("{:pad$}", "");
             }
         }
+        println!();
         for year_month in self.year_months {
             let year = year_month.year;
             let month = year_month.month;
@@ -209,12 +231,21 @@ impl<'a> Table<'a> {
                 continue;
             };
             for (j, cell) in row.iter().enumerate() {
+                let mut fmt = String::with_capacity(col_width);
+                match write!(&mut fmt, "{:>#col_width$}", cell.money) {
+                    Ok(_) => {}
+                    Err(e) => println!("{}", e.to_string()),
+                }
+                match cell.money {
+                    m if cell.color && m.is_positive() => print!("{}", fmt.green()),
+                    m if cell.color && m.is_negative() => print!("{}", fmt.bright_red()),
+                    _ => print!("{}", fmt),
+                }
                 if j < row.len() - 1 {
-                    print!("{:>#col_width$}{:pad$}", cell, "");
-                } else {
-                    println!("{:>#col_width$}", cell);
+                    print!("{:pad$}", "");
                 }
             }
+            println!();
         }
     }
 }

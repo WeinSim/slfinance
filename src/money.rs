@@ -165,6 +165,10 @@ pub struct Money {
 }
 
 impl Money {
+    pub fn is_positive(&self) -> bool {
+        self.cents > 0
+    }
+
     pub fn is_negative(&self) -> bool {
         self.cents < 0
     }
@@ -182,9 +186,17 @@ impl PartialEq for Money {
     }
 }
 
+impl Eq for Money {}
+
 impl PartialOrd for Money {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.cents.partial_cmp(&other.cents)
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Money {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.cents.cmp(&other.cents)
     }
 }
 
@@ -255,7 +267,7 @@ impl Display for Money {
             }
             major_str = buf;
         }
-        let mut base_str = String::new();
+        let mut base_str = String::with_capacity(major_str.capacity() + 1);
         if f.sign_plus() {
             base_str.push(if self.is_negative() { '-' } else { '+' });
         }
