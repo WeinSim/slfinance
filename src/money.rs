@@ -109,6 +109,10 @@ impl MoneyList {
         &self.categories
     }
 
+    pub fn entries(&self) -> &HashMap<YearMonth, Vec<MoneyChange>> {
+        &self.entries
+    }
+
     pub fn get_year_months(&self) -> Vec<YearMonth> {
         let mut vec: Vec<YearMonth> = self.entries.keys().copied().collect();
         vec.sort();

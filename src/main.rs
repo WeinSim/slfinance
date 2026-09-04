@@ -1,20 +1,22 @@
-use std::{
-    fs,
-    io::{self, Write},
-    sync::LazyLock,
-};
+use std::{env, fs, process::ExitCode, sync::LazyLock};
 
 mod arguments;
 mod money;
 mod serial;
+mod settings;
 mod sutil;
 
 use crate::{
     arguments::{ArgList, Argument},
-    money::Tracker,
+    settings::Settings,
 };
 
+const DEV_BUILD: bool = true;
+// TODO continue: use std::env::home_dir() to get the home directory
+const SETTINGS_FILE: &str = "/home/simon/.slfinance/settings.json";
+
 static CONFIG: LazyLock<Config> = LazyLock::new(init_config);
+static SETTINGS: LazyLock<Settings> = LazyLock::new(load_settings);
 
 // const MONTHS: &[Month] = &[
 //     Month::January,
@@ -31,92 +33,61 @@ static CONFIG: LazyLock<Config> = LazyLock::new(init_config);
 //     Month::December,
 // ];
 
-fn main() {
-    sutil::print_num_lines();
-    // parse arguments
-    // skip first argument ('slfinance')
-    let mut app_state: AppState = AppState::new();
+fn main() -> ExitCode {
+    if DEV_BUILD {
+        sutil::print_num_lines();
+    }
     let args = &std::env::args().collect::<Vec<String>>()[1..];
-    if process_input(args, &mut app_state) {
-        run_interactive(&mut app_state);
+    match run(args) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(msg) => {
+            println!("{}", msg);
+            ExitCode::FAILURE
+        }
     }
 }
 
-/// Returns whether the program should run in interactive mode if this is the initial call to slfinance.
-fn process_input(input: &[String], app_state: &mut AppState) -> bool {
-    let arg_list = match ArgList::parse(input) {
-        Some(a) => a,
-        None => {
-            print_help();
-            return false;
-        }
-    };
+fn run(args: &[String]) -> Result<(), String> {
+    let arg_list = ArgList::parse(args).ok_or(CONFIG.help_message.clone())?;
     // process arguments
-    let mut run_interactive = true;
-    let mut filename: Option<&str> = None;
+    let mut filename: Option<String> = None;
+    let mut run_command = true;
     for arg in arg_list.args() {
         match arg {
             Argument::Help => {
                 print_help();
-                run_interactive = false;
+                run_command = false;
             }
             Argument::Version => {
                 print_version();
-                run_interactive = false;
+                run_command = false;
             }
             Argument::File(f) => {
-                filename = Some(f);
+                filename = Some(f.to_owned());
             }
             Argument::Command(_) => {
                 // should never happen
-                panic!("Error: detected command in non-command arg list");
+                return Err("Error: detected command in non-command arg list".to_owned());
             }
             _ => {}
         }
     }
-    if let Some(filename) = filename {
-        match serial::load_file(filename) {
-            Ok(t) => {
-                app_state.tracker = Some(t);
-            }
-            Err(msg) => {
-                println!("Unable to open file \"{filename}\": {msg}");
-            }
-        }
+    if !run_command {
+        return Ok(());
     }
+    let mut tracker = serial::load_file(
+        &filename.unwrap_or(
+            SETTINGS
+                .get("lastOpenedFile".to_owned())
+                .ok_or("Unable to find last opened file. Use --file to specify a file to open")?,
+        ),
+    )?;
+    // format!("Unable to open file \"{filename}\": {msg}");
+    // }
     if let Some(command) = arg_list.command() {
-        command.run(arg_list.args(), app_state);
-        run_interactive = false;
-    }
-    run_interactive
-}
-
-fn run_interactive(app_state: &mut AppState) {
-    println!("{}", CONFIG.version_message.lines().next().unwrap_or(""));
-    println!("Type `help` for further information.");
-    loop {
-        print!("$ ");
-        match io::stdout().flush() {
-            Ok(()) => {}
-            Err(e) => {
-                println!("{e}");
-            }
-        }
-        let mut user_input = String::new();
-        match io::stdin().read_line(&mut user_input) {
-            Ok(_) => {
-                process_input(
-                    &user_input
-                        .split_whitespace()
-                        .map(|s| s.to_owned())
-                        .collect::<Vec<String>>(),
-                    app_state,
-                );
-            }
-            Err(e) => {
-                println!("{e}");
-            }
-        }
+        command.run(arg_list.args(), &mut tracker)
+    } else {
+        Err(CONFIG.help_message.clone())
     }
 }
 
@@ -142,12 +113,12 @@ fn init_config() -> Config {
     }
 }
 
-struct AppState {
-    tracker: Option<Tracker>,
-}
-
-impl AppState {
-    fn new() -> Self {
-        Self { tracker: None }
+fn load_settings() -> Settings {
+    match Settings::load(SETTINGS_FILE) {
+        Ok(settings) => settings,
+        Err(e) => {
+            println!("Unable to load settings: {e}");
+            Settings::default()
+        }
     }
 }

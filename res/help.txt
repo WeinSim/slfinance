@@ -1,16 +1,15 @@
 Usage:
     slfinance [<command>] [<options>]
 
-Without <command>, slfinance is started in interactive mode.
-
 Commands:
-    list                    Lists information about loaded file.
-    help                    Prints this help message.
-    version                 Prints version and copyright information.
-    exit                    Quits the program.
+    list                    Prints an overview of the current tracker.
 
 Options:
-    --help, -h              Prints this help message.
-    --version, -v           Prints version and copyright information.
-    --file, -f <file>       Opens the specified file.
+    --help, -h              Prints this help message and exists.
+
+    --version, -v           Prints version and copyright information and exists.
+
+    --file, -f <file>       Opens the specified file. If this option is not specified, the
+                            file stored in ~/.slfinance/settings.json is loaded.
+
     --show-categories, -c   Shows each category in a separate column.

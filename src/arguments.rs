@@ -2,11 +2,7 @@ use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use crate::{
-    AppState,
-    money::{Money, MoneyList, YearMonth},
-    print_help, print_version,
-};
+use crate::money::{Money, MoneyList, Tracker, YearMonth};
 
 pub struct ArgList {
     command: Option<Command>,
@@ -71,50 +67,29 @@ impl Argument {
 #[derive(Copy, Clone)]
 pub enum Command {
     List,
-    Help,
-    Version,
-    Exit,
 }
 
 impl Command {
     fn parse(command: &str) -> Option<Self> {
         match command {
             "list" => Some(Self::List),
-            "help" => Some(Self::Help),
-            "version" => Some(Self::Version),
-            "exit" => Some(Self::Exit),
             _ => None,
         }
     }
 
-    pub fn run(&self, args: &[Argument], app_state: &mut AppState) {
+    pub fn run(&self, args: &[Argument], tracker: &mut Tracker) -> Result<(), String> {
         match self {
             Self::List => {
-                list(args, app_state);
-            }
-            Self::Exit => {
-                std::process::exit(0);
-            }
-            Self::Version => {
-                print_version();
-            }
-            Self::Help => {
-                print_help();
+                list(args, tracker);
             } // _ => {
               //     println!("Command not yet implemented");
               // },
         }
+        Ok(())
     }
 }
 
-fn list(args: &[Argument], app_state: &mut AppState) {
-    let tracker = match &app_state.tracker {
-        Some(t) => t,
-        None => {
-            println!("No file opened");
-            return;
-        }
-    };
+fn list(args: &[Argument], tracker: &mut Tracker) {
     let show_categories = args.iter().any(|a| matches!(a, Argument::ShowCategories));
     let year_months = tracker.get_year_months();
     let mut table = Table::new(&year_months);
@@ -122,13 +97,18 @@ fn list(args: &[Argument], app_state: &mut AppState) {
     // table.add_separator();
     table.add_column("Change", true, |ym| tracker.get_total_change(ym), true);
     table.add_column("Diff", true, |ym| tracker.get_diff_total_change(ym), true);
-    table.add_column("Expected", true, |ym| tracker.get_expected_total_change(ym), true);
+    table.add_column(
+        "Expected",
+        true,
+        |ym| tracker.get_expected_total_change(ym),
+        true,
+    );
     table.insert_money_list(&tracker.incomes, "Incomes", show_categories, false);
     table.insert_money_list(&tracker.expenses, "Expenses", show_categories, false);
     let month_width: usize = 3;
     let year_width: usize = 4;
     let pad_left: usize = 2;
-    let col_width: usize = 15;
+    let col_width: usize = 12;
     let pad: usize = 2;
     table.print(month_width, year_width, pad_left, col_width, pad);
 }
@@ -151,10 +131,19 @@ struct Cell {
 
 impl Header<'_> {
     fn print(&self, col_width: usize) {
-        if self.bold {
-            print!("{:>col_width$}", self.name.bold());
+        // we have to copy the name even if it is short enough because we cannot hand back
+        // a reference to buf (since it doesn't live long enough)
+        let name_to_print = if self.name.len() <= col_width {
+            self.name.to_owned()
         } else {
-            print!("{:>col_width$}", self.name);
+            let mut buf = self.name[0..col_width - 3].to_owned();
+            buf.push_str("...");
+            buf
+        };
+        if self.bold {
+            print!("{:>col_width$.col_width$}", name_to_print.bold());
+        } else {
+            print!("{:>col_width$.col_width$}", name_to_print);
         }
     }
 }
@@ -194,7 +183,12 @@ impl<'a> Table<'a> {
         }
         if show_categories {
             for (i, category) in money_list.categories().iter().enumerate() {
-                self.add_column(&category.name, false, |ym| money_list.sum_category(ym, i), false);
+                self.add_column(
+                    &category.name,
+                    false,
+                    |ym| money_list.sum_category(ym, i),
+                    false,
+                );
             }
         }
         if sum_last {
@@ -232,7 +226,7 @@ impl<'a> Table<'a> {
             };
             for (j, cell) in row.iter().enumerate() {
                 let mut fmt = String::with_capacity(col_width);
-                match write!(&mut fmt, "{:>#col_width$}", cell.money) {
+                match write!(&mut fmt, "{:>#col_width$.col_width$}", cell.money) {
                     Ok(_) => {}
                     Err(e) => println!("{}", e.to_string()),
                 }
