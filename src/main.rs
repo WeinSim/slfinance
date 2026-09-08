@@ -1,4 +1,11 @@
-use std::{env, fs, process::ExitCode, sync::LazyLock};
+use std::{
+    fs,
+    path::PathBuf,
+    process::ExitCode,
+    sync::{LazyLock, RwLock},
+};
+
+use dirs;
 
 mod arguments;
 mod money;
@@ -12,26 +19,10 @@ use crate::{
 };
 
 const DEV_BUILD: bool = true;
-// TODO continue: use std::env::home_dir() to get the home directory
-const SETTINGS_FILE: &str = "/home/simon/.slfinance/settings.json";
 
 static CONFIG: LazyLock<Config> = LazyLock::new(init_config);
-static SETTINGS: LazyLock<Settings> = LazyLock::new(load_settings);
-
-// const MONTHS: &[Month] = &[
-//     Month::January,
-//     Month::February,
-//     Month::March,
-//     Month::April,
-//     Month::May,
-//     Month::June,
-//     Month::July,
-//     Month::August,
-//     Month::September,
-//     Month::October,
-//     Month::November,
-//     Month::December,
-// ];
+static SETTINGS: LazyLock<RwLock<Settings>> = LazyLock::new(load_settings);
+static SETTINGS_PATH: LazyLock<Option<PathBuf>> = LazyLock::new(get_settings_path);
 
 fn main() -> ExitCode {
     if DEV_BUILD {
@@ -75,15 +66,19 @@ fn run(args: &[String]) -> Result<(), String> {
     if !run_command {
         return Ok(());
     }
-    let mut tracker = serial::load_file(
-        &filename.unwrap_or(
-            SETTINGS
-                .get("lastOpenedFile".to_owned())
-                .ok_or("Unable to find last opened file. Use --file to specify a file to open")?,
-        ),
-    )?;
-    // format!("Unable to open file \"{filename}\": {msg}");
-    // }
+    let filename = &filename.unwrap_or(
+        SETTINGS
+            .read()
+            .map_err(|_| "Settings lock poisoned")?
+            .get("lastOpenedFile")
+            .ok_or("Unable to find last opened file. Use --file to specify a file to open")?,
+    );
+    SETTINGS
+        .write()
+        .map_err(|_| "Settings lock poisoned")?
+        .set("lastOpenedFile".to_string(), filename)
+        .map_err(|e| e.to_string())?;
+    let mut tracker = serial::load_file(filename)?;
     if let Some(command) = arg_list.command() {
         command.run(arg_list.args(), &mut tracker)
     } else {
@@ -113,12 +108,26 @@ fn init_config() -> Config {
     }
 }
 
-fn load_settings() -> Settings {
-    match Settings::load(SETTINGS_FILE) {
-        Ok(settings) => settings,
-        Err(e) => {
-            println!("Unable to load settings: {e}");
-            Settings::default()
+fn get_settings_path() -> Option<PathBuf> {
+    let dir = dirs::home_dir()?.join(".slfinance");
+    match fs::create_dir_all(&dir) {
+        Ok(()) => {}
+        Err(_) => {
+            println!("Unable to create ~/.slfinance directory");
         }
     }
+    Some(dir.join("settings.json"))
+}
+
+fn load_settings() -> RwLock<Settings> {
+    fn inner() -> Option<Settings> {
+        match Settings::load(SETTINGS_PATH.as_ref()?) {
+            Ok(settings) => Some(settings),
+            Err(e) => {
+                println!("Unable to parse settings file: {e}");
+                None
+            }
+        }
+    }
+    RwLock::new(inner().unwrap_or_default())
 }

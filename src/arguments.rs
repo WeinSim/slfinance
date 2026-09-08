@@ -2,7 +2,11 @@ use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use crate::money::{Money, MoneyList, Tracker, YearMonth};
+use crate::{
+    SETTINGS, SETTINGS_PATH,
+    money::{Money, MoneyList, Tracker, YearMonth},
+    serial::save_file,
+};
 
 pub struct ArgList {
     command: Option<Command>,
@@ -85,7 +89,26 @@ impl Command {
               //     println!("Command not yet implemented");
               // },
         }
-        Ok(())
+        // save settings file
+        if let Some(ref path) = *SETTINGS_PATH {
+            SETTINGS
+                .read()
+                .map_err(|_| "Settings lock poisoned")?
+                .save(path)?;
+        }
+        // save tracker file
+        match SETTINGS
+            .read()
+            .map_err(|_| "Settings lock poinsoned")?
+            .get::<String>("lastOpenedFile")
+        {
+            Some(filename) => {
+                save_file(&filename, tracker).map_err(|msg| format!("Unable to save file: {msg}"))
+            }
+            None => {
+                Err("Unable to find path to save the file. No changes can be saved.".to_owned())
+            }
+        }
     }
 }
 

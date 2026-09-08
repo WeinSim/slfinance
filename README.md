@@ -1,6 +1,6 @@
 # SLFinance
 
-SLFinance is a program for managing private finances. *It is currently is very early
+SLFinance is a program for managing private finances. *It is currently in very early
 development.*
 
 Initially, it will only be available as a command-line tool. Hopefully, there will be a

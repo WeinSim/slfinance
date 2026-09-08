@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::path::PathBuf;
 
 use serde_json::Value;
 
@@ -9,17 +10,24 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn load(filename: &str) -> Result<Self, String> {
-        let json = fs::read_to_string(filename).map_err(|e| e.to_string())?;
+    pub fn load(path: &PathBuf) -> Result<Self, String> {
+        let Ok(json) = fs::read_to_string(path) else {
+            return Ok(Self::default());
+        };
         serde_json::from_str(&json).map_err(|e| e.to_string())
     }
 
-    pub fn get<T>(&self, name: String) -> Option<T>
+    pub fn save(&self, path: &PathBuf) -> Result<(), String> {
+        let json = serde_json::to_string(self).map_err(|e| e.to_string())?;
+        fs::write(path, json).map_err(|e| e.to_string())
+    }
+
+    pub fn get<T>(&self, name: &str) -> Option<T>
     where
         T: serde::de::DeserializeOwned,
     {
         self.settings
-            .get(&name)
+            .get(name)
             .and_then(|value| serde_json::from_value(value.clone()).ok())
     }
 

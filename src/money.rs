@@ -248,8 +248,8 @@ impl Sum<Money> for Money {
 // (e.g. 1,234.45€)
 impl Display for Money {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let major = self.cents / 100;
-        let minor = self.cents % 100;
+        let major = self.cents.abs() / 100;
+        let minor = self.cents.abs() % 100;
         let mut major_str = major.to_string();
         // split groups of 3 digits with commas
         if f.alternate() {
@@ -272,8 +272,10 @@ impl Display for Money {
             major_str = buf;
         }
         let mut base_str = String::with_capacity(major_str.capacity() + 1);
-        if f.sign_plus() {
-            base_str.push(if self.is_negative() { '-' } else { '+' });
+        if self.is_negative() {
+            base_str.push('-');
+        } else if f.sign_plus() {
+            base_str.push('+');
         }
         base_str.push_str(&major_str);
         write!(&mut base_str, ".{minor:02}€")?;

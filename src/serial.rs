@@ -5,7 +5,8 @@ use chrono::{Month, NaiveDate};
 use crate::money::{Category, Money, MoneyChange, MoneyList, Tracker, YearMonth};
 
 pub fn load_file(filename: &str) -> Result<Tracker, String> {
-    let json = fs::read_to_string(filename).map_err(|e| format!("Unable to open file {filename}: {e}"))?;
+    let json =
+        fs::read_to_string(filename).map_err(|e| format!("Unable to open file {filename}: {e}"))?;
     serde_json::from_str::<SerialTracker>(&json)
         .map_err(|e| format!("Unable to parse file {filename}: {e}"))?
         .as_tracker()
@@ -30,9 +31,9 @@ struct SerialTracker {
 impl SerialTracker {
     fn as_tracker(self) -> Result<Tracker, String> {
         let mut tracker = Tracker::new();
-        Self::add_entries(&mut tracker.total, &self.total_categories, &self.total)?;
-        Self::add_entries(&mut tracker.incomes, &self.income_categories, &self.incomes)?;
-        Self::add_entries(
+        Self::add_tracker_entries(&mut tracker.total, &self.total_categories, &self.total)?;
+        Self::add_tracker_entries(&mut tracker.incomes, &self.income_categories, &self.incomes)?;
+        Self::add_tracker_entries(
             &mut tracker.expenses,
             &self.expense_categories,
             &self.expenses,
@@ -40,7 +41,7 @@ impl SerialTracker {
         Ok(tracker)
     }
 
-    fn add_entries(
+    fn add_tracker_entries(
         list: &mut MoneyList,
         categories: &Vec<String>,
         ym_entries: &Vec<YearMonthEntry>,
@@ -74,8 +75,33 @@ impl SerialTracker {
 
     fn from_tracker(tracker: &Tracker) -> Self {
         let mut serial = Self::default();
-        for (ym, entries) in tracker.total.entries() {
-            serial.total.push(YearMonthEntry {
+        Self::add_serial_entries(
+            &mut serial.total,
+            &tracker.total,
+            &mut serial.total_categories,
+        );
+        Self::add_serial_entries(
+            &mut serial.incomes,
+            &tracker.incomes,
+            &mut serial.income_categories,
+        );
+        Self::add_serial_entries(
+            &mut serial.expenses,
+            &tracker.expenses,
+            &mut serial.expense_categories,
+        );
+        serial
+    }
+
+    fn add_serial_entries(
+        serial_list: &mut Vec<YearMonthEntry>,
+        money_list: &MoneyList,
+        categories: &mut Vec<String>,
+    ) {
+        let mut entries = money_list.entries().into_iter().collect::<Vec<_>>();
+        entries.sort_by(|e1, e2| e1.0.cmp(e2.0));
+        for (ym, entries) in entries {
+            serial_list.push(YearMonthEntry {
                 month: ym.month,
                 year: ym.year,
                 entries: entries
@@ -88,7 +114,9 @@ impl SerialTracker {
                     .collect(),
             })
         }
-        serial
+        for category in money_list.categories() {
+            categories.push(category.name.to_owned());
+        }
     }
 }
 
