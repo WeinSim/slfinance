@@ -6,7 +6,7 @@ use std::{
     ops::{Add, AddAssign, Sub, SubAssign},
 };
 
-use chrono::{Month, NaiveDate};
+use chrono::{Datelike, Month, NaiveDate};
 
 pub struct Tracker {
     pub total: MoneyList,
@@ -70,7 +70,19 @@ impl MoneyList {
         if !self.allow_dates && entry.date.is_some() {
             return Err("A 'total' entry cannot have a date associated with it".to_owned());
         }
-        match entry.category {
+        if let Some(date) = entry.date {
+            if date.month() != year_month.month.number_from_month() {
+                return Err(
+                    "Given YearMonth does not match the month specified by 'entry'".to_owned(),
+                );
+            }
+            if date.year() != year_month.year {
+                return Err(
+                    "Given YearMonth does not match the year specified by 'entry'".to_owned(),
+                );
+            }
+        }
+        match entry.category_id {
             Some(i) if i >= self.categories.len() => {
                 return Err(format!(
                     "Index out of range (index={}, len={}",
@@ -96,9 +108,23 @@ impl MoneyList {
         };
         entries
             .iter()
-            .filter(|e| e.category.is_some_and(|i| i == category))
+            .filter(|e| e.category_id.is_some_and(|i| i == category))
             .map(|mc| mc.amount)
             .sum()
+    }
+
+    pub fn find_category(&self, name: &str) -> Option<usize> {
+        self.categories.iter().position(|c| c.name == name)
+    }
+
+    pub fn find_or_create_category(&mut self, name: &str) -> usize {
+        match self.find_category(name) {
+            Some(i) => i,
+            None => {
+                self.add_category(Category { name: name.to_owned() });
+                self.categories.len() - 1
+            }
+        }
     }
 
     pub fn add_category(&mut self, category: Category) {
@@ -137,6 +163,27 @@ impl YearMonth {
             month: self.month.succ(),
         }
     }
+
+    pub fn pred(&self) -> Self {
+        Self {
+            year: if self.month == Month::January {
+                self.year - 1
+            } else {
+                self.year
+            },
+            month: self.month.pred(),
+        }
+    }
+}
+
+impl Sub for &YearMonth {
+    type Output = i32;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        let year_diff = self.year - rhs.year;
+        let month_diff = self.month.number_from_month() - rhs.month.number_from_month();
+        12 * year_diff + (month_diff as i32)
+    }
 }
 
 impl Ord for YearMonth {
@@ -160,7 +207,13 @@ impl PartialOrd for YearMonth {
 pub struct MoneyChange {
     pub amount: Money,
     pub date: Option<NaiveDate>,
-    pub category: Option<usize>,
+    pub category_id: Option<usize>,
+}
+
+impl MoneyChange {
+    pub fn category<'a>(&self, list: &'a MoneyList) -> Option<&'a Category> {
+        Some(&list.categories()[self.category_id?])
+    }
 }
 
 #[derive(Clone, Copy)]

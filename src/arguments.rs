@@ -1,7 +1,9 @@
+use chrono::{Datelike, Local, Month};
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::fmt::Write;
 
+use crate::money::MoneyChange;
 use crate::{
     SETTINGS, SETTINGS_PATH,
     money::{Money, MoneyList, Tracker, YearMonth},
@@ -15,23 +17,22 @@ pub struct ArgList {
 
 impl ArgList {
     pub fn parse(args_raw: &[String]) -> Option<Self> {
-        let mut arg_index: usize = 0;
+        let mut index: usize = 0;
         let mut args: Vec<Argument> = Vec::new();
         let mut command: Option<Command> = None;
-        while arg_index < args_raw.len() {
-            match Argument::parse(args_raw, &mut arg_index)? {
-                Argument::Command(cmd) => {
-                    if args.is_empty() && command.is_none() {
-                        command = Some(cmd);
-                    } else {
-                        return None;
-                    }
+        while index < args_raw.len() {
+            if let Some(arg) = Argument::parse(args_raw, &mut index) {
+                args.push(arg);
+            } else if let Some(cmd) = Command::parse(args_raw, &mut index) {
+                if command.is_some() {
+                    return None;
+                } else {
+                    command = Some(cmd);
                 }
-                arg => {
-                    args.push(arg);
-                }
+            } else {
+                return None;
             }
-            arg_index += 1;
+            index += 1;
         }
         Some(Self { command, args })
     }
@@ -46,48 +47,105 @@ impl ArgList {
 }
 
 pub enum Argument {
-    Command(Command),
     Version,
     Help,
     File(String),
     ShowCategories,
 }
 
-impl Argument {
-    pub fn parse(args_raw: &[String], index: &mut usize) -> Option<Self> {
-        match args_raw.get(*index)?.as_str() {
+pub(crate) enum Command {
+    List,
+    Add(MoneyListType, String, Money),
+}
+
+pub(crate) enum MoneyListType {
+    Total,
+    Income,
+    Expense,
+}
+
+trait Parse {
+    fn parse(args: &[String], index: &mut usize) -> Option<Self>
+    where
+        Self: Sized;
+}
+
+impl Parse for Argument {
+    fn parse(args: &[String], index: &mut usize) -> Option<Self> {
+        match args.get(*index)?.as_str() {
             "--version" | "-v" => Some(Self::Version),
             "--help" | "-h" => Some(Self::Help),
             "--file" | "-f" => {
                 *index += 1;
-                Some(Self::File(args_raw.get(*index)?.to_owned()))
+                Some(Self::File(args.get(*index)?.to_owned()))
             }
             "--show-categories" | "-c" => Some(Self::ShowCategories),
-            command => Some(Self::Command(Command::parse(command)?)),
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
-pub enum Command {
-    List,
-}
-
-impl Command {
-    fn parse(command: &str) -> Option<Self> {
-        match command {
-            "list" => Some(Self::List),
             _ => None,
         }
     }
+}
 
+impl Parse for Command {
+    fn parse(args: &[String], index: &mut usize) -> Option<Self> {
+        match args.get(*index)?.as_str() {
+            "list" => Some(Self::List),
+            "add" => {
+                *index += 1;
+                let list_type = MoneyListType::parse(args, index)?;
+                *index += 1;
+                let cat_name = args.get(*index)?.to_owned();
+                *index += 1;
+                let euros = args.get(*index)?.parse::<i64>().ok()?;
+                Some(Self::Add(list_type, cat_name, Money { cents: euros * 100 }))
+            }
+            _ => None,
+        }
+    }
+}
+
+impl Parse for MoneyListType {
+    fn parse(args: &[String], index: &mut usize) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        match args.get(*index)?.as_str() {
+            "total" | "t" => Some(Self::Total),
+            "income" | "i" => Some(Self::Income),
+            "expense" | "e" => Some(Self::Expense),
+            _ => None,
+        }
+    }
+}
+
+impl Command {
     pub fn run(&self, args: &[Argument], tracker: &mut Tracker) -> Result<(), String> {
         match self {
             Self::List => {
                 list(args, tracker);
-            } // _ => {
-              //     println!("Command not yet implemented");
-              // },
+            }
+            Self::Add(list_type, cat_name, amount) => {
+                let date = Local::now().date_naive();
+                let list = match list_type {
+                    MoneyListType::Total => &mut tracker.total,
+                    MoneyListType::Income => &mut tracker.incomes,
+                    MoneyListType::Expense => &mut tracker.expenses,
+                };
+                let cat_id = list.find_or_create_category(cat_name);
+                list.add_entry(
+                    YearMonth {
+                        year: date.year(),
+                        month: Month::try_from(date.month() as u8).unwrap(),
+                    },
+                    MoneyChange {
+                        amount: *amount,
+                        date: match list_type {
+                            MoneyListType::Total => None,
+                            _ => Some(date),
+                        },
+                        category_id: Some(cat_id),
+                    },
+                )?;
+            }
         }
         // save settings file
         if let Some(ref path) = *SETTINGS_PATH {
@@ -139,7 +197,7 @@ fn list(args: &[Argument], tracker: &mut Tracker) {
 struct Table<'a> {
     headers: Vec<Header<'a>>,
     cells: HashMap<YearMonth, Vec<Cell>>,
-    year_months: &'a Vec<YearMonth>,
+    row_keys: Vec<RowKey>,
 }
 
 struct Header<'a> {
@@ -150,6 +208,11 @@ struct Header<'a> {
 struct Cell {
     money: Money,
     color: bool,
+}
+
+enum RowKey {
+    YearMonth(YearMonth),
+    Dots,
 }
 
 impl Header<'_> {
@@ -172,11 +235,45 @@ impl Header<'_> {
 }
 
 impl<'a> Table<'a> {
-    fn new(year_months: &'a Vec<YearMonth>) -> Self {
+    fn new(year_months: &Vec<YearMonth>) -> Self {
+        // pad year_months to fill in gaps
+        // // doing a double reverse gives constant O(n) time complexity, instead of
+        // // best-case O(1) (if no Dots have to be inserted at all) and worst-case O(n^2)
+        // // (if Dots have to be inserted) at every other slot).
+        // // let mut reversed = year_months
+        //     .iter()
+        //     .rev()
+        //     .map(|ym| RowKey::YearMonth(*ym))
+        //     .collect::<Vec<_>>();
+        // while let Some(row_key) = reversed.pop() {
+        //     row_keys.push(row_key);
+        // }
+        let mut row_keys: Vec<_> = year_months
+            .iter()
+            .map(|ym| RowKey::YearMonth(*ym))
+            .collect();
+        let mut i: usize = 0;
+        while i < row_keys.len() - 1 {
+            // the let statement and the if statement are separate because we need a
+            // mutable borrow of row_keys to insert elements, which is not possible while
+            // we are holding two immutable references to values inside of row_keys.
+            let to_insert: Option<(YearMonth, YearMonth)> = match (&row_keys[i], &row_keys[i + 1]) {
+                (RowKey::YearMonth(current), RowKey::YearMonth(next)) if next - current > 2 => {
+                    Some((current.succ(), next.pred()))
+                }
+                _ => None,
+            };
+            if let Some((ym1, ym2)) = to_insert {
+                row_keys.insert(i + 1, RowKey::YearMonth(ym1));
+                row_keys.insert(i + 2, RowKey::Dots);
+                row_keys.insert(i + 3, RowKey::YearMonth(ym2));
+            }
+            i += 1;
+        }
         Self {
             headers: Vec::new(),
             cells: HashMap::new(),
-            year_months,
+            row_keys,
         }
     }
 
@@ -185,11 +282,13 @@ impl<'a> Table<'a> {
         F: Fn(&YearMonth) -> Money,
     {
         self.headers.push(Header { name, bold });
-        for year_month in self.year_months {
-            self.cells.entry(*year_month).or_default().push(Cell {
-                money: entries(year_month),
-                color,
-            });
+        for key in &self.row_keys {
+            if let RowKey::YearMonth(year_month) = key {
+                self.cells.entry(*year_month).or_default().push(Cell {
+                    money: entries(year_month),
+                    color,
+                });
+            }
         }
     }
 
@@ -235,34 +334,39 @@ impl<'a> Table<'a> {
             }
         }
         println!();
-        for year_month in self.year_months {
-            let year = year_month.year;
-            let month = year_month.month;
-            print!(
-                "{:month_width$} {:year_width$}{:pad_left$}",
-                &month.name()[..3],
-                year,
-                ""
-            );
-            let Some(row) = self.cells.get(&year_month) else {
-                continue;
-            };
-            for (j, cell) in row.iter().enumerate() {
-                let mut fmt = String::with_capacity(col_width);
-                match write!(&mut fmt, "{:>#col_width$.col_width$}", cell.money) {
-                    Ok(_) => {}
-                    Err(e) => println!("{}", e.to_string()),
+        for key in &self.row_keys {
+            match key {
+                RowKey::YearMonth(year_month) => {
+                    let year = year_month.year;
+                    let month = year_month.month;
+                    print!(
+                        "{:month_width$} {:year_width$}{:pad_left$}",
+                        &month.name()[..3],
+                        year,
+                        ""
+                    );
+                    let Some(row) = self.cells.get(&year_month) else {
+                        continue;
+                    };
+                    for (j, cell) in row.iter().enumerate() {
+                        let mut fmt = String::with_capacity(col_width);
+                        match write!(&mut fmt, "{:>#col_width$.col_width$}", cell.money) {
+                            Ok(_) => {}
+                            Err(e) => println!("{}", e.to_string()),
+                        }
+                        match cell.money {
+                            m if cell.color && m.is_positive() => print!("{}", fmt.green()),
+                            m if cell.color && m.is_negative() => print!("{}", fmt.bright_red()),
+                            _ => print!("{}", fmt),
+                        }
+                        if j < row.len() - 1 {
+                            print!("{:pad$}", "");
+                        }
+                    }
+                    println!();
                 }
-                match cell.money {
-                    m if cell.color && m.is_positive() => print!("{}", fmt.green()),
-                    m if cell.color && m.is_negative() => print!("{}", fmt.bright_red()),
-                    _ => print!("{}", fmt),
-                }
-                if j < row.len() - 1 {
-                    print!("{:pad$}", "");
-                }
+                RowKey::Dots => println!("..."),
             }
-            println!();
         }
     }
 }

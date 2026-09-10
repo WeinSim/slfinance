@@ -4,6 +4,14 @@ Usage:
 Commands:
     list                    Prints an overview of the current tracker.
 
+    add <list> <category> <amount>
+                            Adds an entry to <list>, which can be either 't' or 'total' to
+                            add to the list of total money, 'i' or 'income' to add an
+                            income or 'e' or 'expenses' to add an expense.
+                            If <category> doesn't exist, a new category will be created.
+                            The entry will be inserted into the current month / year.
+                            <amount> should be an integer, which is interpreted as euros.
+
 Options:
     --help, -h              Prints this help message and exists.
 

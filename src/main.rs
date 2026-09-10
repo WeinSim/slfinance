@@ -18,7 +18,7 @@ use crate::{
     settings::Settings,
 };
 
-const DEV_BUILD: bool = true;
+const DEV_BUILD: bool = false;
 
 static CONFIG: LazyLock<Config> = LazyLock::new(init_config);
 static SETTINGS: LazyLock<RwLock<Settings>> = LazyLock::new(load_settings);
@@ -55,10 +55,6 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             Argument::File(f) => {
                 filename = Some(f.to_owned());
-            }
-            Argument::Command(_) => {
-                // should never happen
-                return Err("Error: detected command in non-command arg list".to_owned());
             }
             _ => {}
         }

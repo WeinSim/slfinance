@@ -64,7 +64,7 @@ impl SerialTracker {
                     ym,
                     MoneyChange {
                         amount,
-                        category: entry.category,
+                        category_id: entry.category,
                         date: entry.date,
                     },
                 )?;
@@ -107,7 +107,7 @@ impl SerialTracker {
                 entries: entries
                     .iter()
                     .map(|mc| Entry {
-                        category: mc.category,
+                        category: mc.category_id,
                         amount: mc.amount.cents,
                         date: mc.date,
                     })
