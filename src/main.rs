@@ -7,16 +7,14 @@ use std::{
 
 use dirs;
 
-mod arguments;
-mod csv_conversion;
+mod commands;
 mod money;
 mod serial;
 mod settings;
 mod sutil;
 
 use crate::{
-    arguments::{ArgList, Argument},
-    csv_conversion::convert,
+    commands::{ArgList, Argument},
     settings::Settings,
 };
 
@@ -31,8 +29,8 @@ fn main() -> ExitCode {
         sutil::print_num_lines();
     }
     let args = &std::env::args().collect::<Vec<String>>()[1..];
-    // match run(args) {
-    match convert(args) {
+    match run(args) {
+        // match convert(args) {
         Ok(()) => ExitCode::SUCCESS,
         Err(msg) => {
             println!("{}", msg);
@@ -44,7 +42,6 @@ fn main() -> ExitCode {
 fn run(args: &[String]) -> Result<(), String> {
     let arg_list = ArgList::parse(args).ok_or(CONFIG.help_message.clone())?;
     // process arguments
-    let mut filename: Option<String> = None;
     let mut run_command = true;
     for arg in arg_list.args() {
         match arg {
@@ -56,30 +53,14 @@ fn run(args: &[String]) -> Result<(), String> {
                 print_version();
                 run_command = false;
             }
-            Argument::File(f) => {
-                filename = Some(f.to_owned());
-            }
             _ => {}
         }
     }
     if !run_command {
         return Ok(());
     }
-    let filename = &filename.unwrap_or(
-        SETTINGS
-            .read()
-            .map_err(|_| "Settings lock poisoned")?
-            .get("lastOpenedFile")
-            .ok_or("Unable to find last opened file. Use --file to specify a file to open")?,
-    );
-    SETTINGS
-        .write()
-        .map_err(|_| "Settings lock poisoned")?
-        .set("lastOpenedFile".to_string(), filename)
-        .map_err(|e| e.to_string())?;
-    let mut tracker = serial::load_file(filename)?;
     if let Some(command) = arg_list.command() {
-        command.run(arg_list.args(), &mut tracker)
+        command.run(arg_list.args())
     } else {
         Err(CONFIG.help_message.clone())
     }

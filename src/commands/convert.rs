@@ -3,16 +3,11 @@ use std::fs;
 use chrono::Month;
 
 use crate::{
-    arguments::{Argument, list}, money::{Category, Money, MoneyChange, MoneyList, Tracker, YearMonth}, serial::save_file,
+    money::{Category, Money, MoneyChange, MoneyList, Tracker, YearMonth}, serial::save_file,
 };
 
-pub fn convert(args: &[String]) -> Result<(), String> {
-    if args.len() != 2 {
-        return Err(
-            "slfinance CSV conversion.\nUsage: slfinance <input-file> <output-file>".to_owned(),
-        );
-    }
-    let input = fs::read_to_string(args[0].clone()).map_err(|e| e.to_string())?;
+pub fn convert(input_file: &str, output_file: &str) -> Result<(), String> {
+    let input = fs::read_to_string(input_file).map_err(|e| e.to_string())?;
     let mut tsv: Vec<Vec<&str>> = Vec::new();
     for line in input.lines() {
         tsv.push(line.split('\t').collect());
@@ -28,8 +23,7 @@ pub fn convert(args: &[String]) -> Result<(), String> {
     add_list(&mut i, num_income_categories, &mut tracker.incomes, &tsv)?;
     i += 1;
     add_list(&mut i, num_expense_categories, &mut tracker.expenses, &tsv)?;
-    list(&[], &tracker);
-    save_file(&args[1], &tracker)
+    save_file(output_file, &tracker)
 }
 
 fn add_list(
