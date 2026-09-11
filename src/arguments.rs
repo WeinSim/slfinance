@@ -170,7 +170,7 @@ impl Command {
     }
 }
 
-fn list(args: &[Argument], tracker: &mut Tracker) {
+pub fn list(args: &[Argument], tracker: &Tracker) {
     let show_categories = args.iter().any(|a| matches!(a, Argument::ShowCategories));
     let year_months = tracker.get_year_months();
     let mut table = Table::new(&year_months);
@@ -189,6 +189,7 @@ fn list(args: &[Argument], tracker: &mut Tracker) {
     let month_width: usize = 3;
     let year_width: usize = 4;
     let pad_left: usize = 2;
+    // can fit at most -999,999.99€
     let col_width: usize = 12;
     let pad: usize = 2;
     table.print(month_width, year_width, pad_left, col_width, pad);
@@ -219,10 +220,14 @@ impl Header<'_> {
     fn print(&self, col_width: usize) {
         // we have to copy the name even if it is short enough because we cannot hand back
         // a reference to buf (since it doesn't live long enough)
-        let name_to_print = if self.name.len() <= col_width {
+        let num_chars = self.name.chars().count();
+        let name_to_print = if num_chars <= col_width {
             self.name.to_owned()
         } else {
-            let mut buf = self.name[0..col_width - 3].to_owned();
+            let mut buf = match self.name.char_indices().nth(col_width - 3) {
+                Some((i, _)) => self.name[0..i].to_owned(),
+                None => self.name.to_owned(),
+            };
             buf.push_str("...");
             buf
         };

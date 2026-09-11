@@ -8,6 +8,7 @@ use std::{
 use dirs;
 
 mod arguments;
+mod csv_conversion;
 mod money;
 mod serial;
 mod settings;
@@ -15,6 +16,7 @@ mod sutil;
 
 use crate::{
     arguments::{ArgList, Argument},
+    csv_conversion::convert,
     settings::Settings,
 };
 
@@ -29,7 +31,8 @@ fn main() -> ExitCode {
         sutil::print_num_lines();
     }
     let args = &std::env::args().collect::<Vec<String>>()[1..];
-    match run(args) {
+    // match run(args) {
+    match convert(args) {
         Ok(()) => ExitCode::SUCCESS,
         Err(msg) => {
             println!("{}", msg);

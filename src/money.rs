@@ -121,7 +121,9 @@ impl MoneyList {
         match self.find_category(name) {
             Some(i) => i,
             None => {
-                self.add_category(Category { name: name.to_owned() });
+                self.add_category(Category {
+                    name: name.to_owned(),
+                });
                 self.categories.len() - 1
             }
         }
@@ -181,8 +183,9 @@ impl Sub for &YearMonth {
 
     fn sub(self, rhs: Self) -> Self::Output {
         let year_diff = self.year - rhs.year;
-        let month_diff = self.month.number_from_month() - rhs.month.number_from_month();
-        12 * year_diff + (month_diff as i32)
+        let month_diff =
+            (self.month.number_from_month() as i32) - (rhs.month.number_from_month() as i32);
+        12 * year_diff + month_diff
     }
 }
 
