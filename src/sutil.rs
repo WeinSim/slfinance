@@ -59,3 +59,36 @@ fn count_path(path: &Path) -> bool {
         _ => false,
     }
 }
+
+pub fn split_into_lines<'a>(text: &'a str, line_width: usize) -> Vec<&'a str> {
+    struct StrPos {
+        char: usize,
+        byte: usize,
+    }
+    let mut lines: Vec<&'a str> = Vec::new();
+    let mut last_space = StrPos { char: 0, byte: 0 };
+    let mut line_start = StrPos { char: 0, byte: 0 };
+    let mut char: usize = 0;
+    for (byte, c) in text.char_indices() {
+        if c == ' ' {
+            last_space = StrPos { char, byte };
+        }
+        if char - line_start.char == line_width {
+            if last_space.char > line_start.char {
+                // gentle split at last space
+                lines.push(&text[line_start.byte..last_space.byte]);
+                line_start = StrPos {
+                    char: last_space.char + 1,
+                    byte: last_space.byte + 1,
+                };
+            } else {
+                // hard split in the middle of the word
+                lines.push(&text[line_start.byte..byte]);
+                line_start = StrPos { char, byte };
+            }
+        }
+        char += 1;
+    }
+    lines.push(&text[line_start.byte..]);
+    lines
+}

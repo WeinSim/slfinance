@@ -2,7 +2,11 @@ use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use crate::{commands::Argument, money::{Money, MoneyList, Tracker, YearMonth}};
+use crate::{
+    commands::Argument,
+    money::{Money, MoneyList, Tracker, YearMonth},
+    sutil,
+};
 
 pub fn list(args: &[Argument], tracker: &Tracker) {
     let show_categories = args.iter().any(|a| matches!(a, Argument::ShowCategories));
@@ -24,7 +28,7 @@ pub fn list(args: &[Argument], tracker: &Tracker) {
     let year_width: usize = 4;
     let pad_left: usize = 2;
     // can fit at most -999,999.99€
-    let col_width: usize = 12;
+    let col_width: usize = 13;
     let pad: usize = 2;
     table.print(month_width, year_width, pad_left, col_width, pad);
 }
@@ -38,6 +42,7 @@ struct Table<'a> {
 struct Header<'a> {
     name: &'a str,
     bold: bool,
+    lines: Option<(usize, Vec<&'a str>)>,
 }
 
 struct Cell {
@@ -50,27 +55,62 @@ enum RowKey {
     Dots,
 }
 
-impl Header<'_> {
-    fn print(&self, col_width: usize) {
-        // we have to copy the name even if it is short enough because we cannot hand back
-        // a reference to buf (since it doesn't live long enough)
-        let num_chars = self.name.chars().count();
-        let name_to_print = if num_chars <= col_width {
-            self.name.to_owned()
-        } else {
-            let mut buf = match self.name.char_indices().nth(col_width - 3) {
-                Some((i, _)) => self.name[0..i].to_owned(),
-                None => self.name.to_owned(),
-            };
-            buf.push_str("...");
-            buf
-        };
-        if self.bold {
-            print!("{:>col_width$.col_width$}", name_to_print.bold());
-        } else {
-            print!("{:>col_width$.col_width$}", name_to_print);
+impl<'a> Header<'a> {
+    fn new(name: &'a str, bold: bool) -> Self {
+        Self {
+            name,
+            bold,
+            lines: None,
         }
     }
+
+    fn get_lines(&mut self, col_width: usize) -> &[&'a str] {
+        match &self.lines {
+            Some((width, lines)) if *width == col_width => lines,
+            _ => {
+                let lines = sutil::split_into_lines(self.name, col_width);
+                self.lines = Some((col_width, lines));
+                &self.lines.as_ref().unwrap().1
+            }
+        }
+    }
+
+    fn get_num_lines(&mut self, col_width: usize) -> usize {
+        self.get_lines(col_width).len()
+    }
+
+    fn print_line(&mut self, line_number: usize, col_width: usize) {
+        let line = match self.get_lines(col_width).get(line_number) {
+            Some(l) => l,
+            None => "",
+        };
+        if self.bold {
+            print!("{:<col_width$.col_width$}", line.bold());
+        } else {
+            print!("{:<col_width$.col_width$}", line);
+        }
+    }
+
+    // fn print(&self, col_width: usize) {
+    //     // we have to copy the name even if it is short enough because we cannot hand back
+    //     // a reference to buf (since it doesn't live long enough)
+    //     let num_chars = self.name.chars().count();
+    //     let name_to_print = if num_chars <= col_width {
+    //         self.name.to_owned()
+    //     } else {
+    //         let mut buf = match self.name.char_indices().nth(col_width - 3) {
+    //             Some((i, _)) => self.name[0..i].to_owned(),
+    //             None => self.name.to_owned(),
+    //         };
+    //         buf.push_str("...");
+    //         buf
+    //     };
+    //     if self.bold {
+    //         print!("{:>col_width$.col_width$}", name_to_print.bold());
+    //     } else {
+    //         print!("{:>col_width$.col_width$}", name_to_print);
+    //     }
+    // }
 }
 
 impl<'a> Table<'a> {
@@ -120,7 +160,7 @@ impl<'a> Table<'a> {
     where
         F: Fn(&YearMonth) -> Money,
     {
-        self.headers.push(Header { name, bold });
+        self.headers.push(Header::new(name, bold));
         for key in &self.row_keys {
             if let RowKey::YearMonth(year_month) = key {
                 self.cells.entry(*year_month).or_default().push(Cell {
@@ -158,21 +198,40 @@ impl<'a> Table<'a> {
     }
 
     fn print(
-        &self,
+        &mut self,
         month_width: usize,
         year_width: usize,
         pad_left: usize,
         col_width: usize,
         pad: usize,
     ) {
-        print!("{:month_width$} {:year_width$}{:pad_left$}", "", "", "");
-        for (i, header) in self.headers.iter().enumerate() {
-            header.print(col_width);
-            if i < self.headers.len() - 1 {
-                print!("{:pad$}", "");
-            }
+        if self.headers.is_empty() || self.row_keys.is_empty() {
+            println!("[empty]");
+            return;
         }
-        println!();
+        // print headers
+        let num_headers = self.headers.len();
+        let num_header_rows = self
+            .headers
+            .iter_mut()
+            .map(|h| h.get_num_lines(col_width))
+            .max()
+            .unwrap();
+        for i in 0..num_header_rows {
+            print!("{:month_width$} {:year_width$}{:pad_left$}", "", "", "");
+            for (j, header) in self.headers.iter_mut().enumerate() {
+                let offset = num_header_rows - header.get_num_lines(col_width);
+                header.print_line(i.wrapping_sub(offset), col_width);
+                if j < num_headers - 1 {
+                    print!("{:pad$}", "");
+                }
+            }
+            println!();
+        }
+        if num_header_rows > 1 {
+            println!();
+        }
+        // print actual rows
         for key in &self.row_keys {
             match key {
                 RowKey::YearMonth(year_month) => {

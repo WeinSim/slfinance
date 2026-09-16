@@ -346,7 +346,7 @@ impl Display for Money {
             base_str.push('+');
         }
         base_str.push_str(&major_str);
-        write!(&mut base_str, ".{minor:02}€")?;
+        write!(&mut base_str, ".{minor:02} €")?;
         // let align = f.align().unwrap_or(Alignment::Right);
         // this should automatically account for width, fill and alignment.
         f.pad(&base_str)
