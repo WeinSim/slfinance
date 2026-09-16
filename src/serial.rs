@@ -28,6 +28,21 @@ struct SerialTracker {
     expense_categories: Vec<String>,
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+struct YearMonthEntry {
+    month: Month,
+    year: i32,
+    entries: Vec<Entry>,
+}
+
+#[serde_with::skip_serializing_none]
+#[derive(serde::Deserialize, serde::Serialize)]
+struct Entry {
+    category: Option<usize>,
+    amount: i64,
+    date: Option<NaiveDate>,
+}
+
 impl SerialTracker {
     fn as_tracker(self) -> Result<Tracker, String> {
         let mut tracker = Tracker::new();
@@ -118,18 +133,4 @@ impl SerialTracker {
             categories.push(category.name.to_owned());
         }
     }
-}
-
-#[derive(serde::Deserialize, serde::Serialize)]
-struct YearMonthEntry {
-    month: Month,
-    year: i32,
-    entries: Vec<Entry>,
-}
-
-#[derive(serde::Deserialize, serde::Serialize)]
-struct Entry {
-    category: Option<usize>,
-    amount: i64,
-    date: Option<NaiveDate>,
 }

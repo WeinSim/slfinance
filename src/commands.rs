@@ -128,9 +128,9 @@ impl Parse for MoneyListType {
 impl Command {
     pub fn run(&self, args: &[Argument]) -> Result<(), String> {
         match self {
-            Self::List => list(args, &get_tracker(args)?),
+            Self::List => list(args, &load_tracker(args)?),
             Self::Add(list_type, cat_name, amount) => {
-                let mut tracker = get_tracker(args)?;
+                let mut tracker = load_tracker(args)?;
                 let date = Local::now().date_naive();
                 let list = match list_type {
                     MoneyListType::Total => &mut tracker.total,
@@ -167,7 +167,7 @@ impl Command {
     }
 }
 
-fn get_tracker(args: &[Argument]) -> Result<Tracker, String> {
+fn load_tracker(args: &[Argument]) -> Result<Tracker, String> {
     let mut file_arg: Option<String> = None;
     for arg in args {
         match arg {

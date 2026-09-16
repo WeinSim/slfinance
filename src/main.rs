@@ -7,6 +7,7 @@ use std::{
 
 use dirs;
 
+mod expressions;
 mod commands;
 mod money;
 mod serial;

@@ -1,4 +1,4 @@
 /target
 /res/private
 
-convert.sh
+convert*.sh

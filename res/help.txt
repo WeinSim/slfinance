@@ -4,6 +4,9 @@ Usage:
 Commands:
     list                    Prints an overview of the current tracker.
 
+    convert <input-file> <output-file>
+                            Converts a TSV file into the standard SLF json format.
+
     add <list> <category> <amount>
                             Adds an entry to <list>, which can be either 't' or 'total' to
                             add to the list of total money, 'i' or 'income' to add an

@@ -3,7 +3,9 @@ use std::fs;
 use chrono::Month;
 
 use crate::{
-    money::{Category, Money, MoneyChange, MoneyList, Tracker, YearMonth}, serial::save_file,
+    expressions::{Expression, Term},
+    money::{Category, Money, MoneyChange, MoneyList, Tracker, YearMonth},
+    serial::save_file,
 };
 
 pub fn convert(input_file: &str, output_file: &str) -> Result<(), String> {
@@ -16,14 +18,34 @@ pub fn convert(input_file: &str, output_file: &str) -> Result<(), String> {
     let num_total_categories = 8;
     let num_income_categories = 9;
     let num_expense_categories = 5;
-    // start at 1 because cell (0, 0) is empty
+    // start at 1 because that's the first 'total' column
     let mut i: usize = 1;
-    add_list(&mut i, num_total_categories, &mut tracker.total, &tsv)?;
-    i += 5;
-    add_list(&mut i, num_income_categories, &mut tracker.incomes, &tsv)?;
-    i += 1;
-    add_list(&mut i, num_expense_categories, &mut tracker.expenses, &tsv)?;
-    save_file(output_file, &tracker)
+    add_list(
+        &mut i,
+        num_total_categories,
+        &mut tracker.total,
+        &tsv,
+        false,
+    )?;
+    i += 5; // skip all summarizing columns between 'total' and 'incomes'
+    add_list(
+        &mut i,
+        num_income_categories,
+        &mut tracker.incomes,
+        &tsv,
+        true,
+    )?;
+    i += 1; // skip 'expenses' column
+    add_list(
+        &mut i,
+        num_expense_categories,
+        &mut tracker.expenses,
+        &tsv,
+        true,
+    )?;
+    save_file(output_file, &tracker)?;
+    println!("Successfully converted {input_file} to {output_file}");
+    Ok(())
 }
 
 fn add_list(
@@ -31,6 +53,7 @@ fn add_list(
     num: usize,
     list: &mut MoneyList,
     tsv: &Vec<Vec<&str>>,
+    split_terms: bool,
 ) -> Result<(), String> {
     let i_initial = *i;
     for _ in 0..num {
@@ -64,23 +87,31 @@ fn add_list(
         let year_month = YearMonth { year, month };
         *i = i_initial;
         for j in 0..num {
-            let amount = row[*i];
-            let amount = amount.replace(&[',', '.', ' ', '€'], "");
-            let money = if amount.is_empty() {
-                Money::default()
-            } else {
-                Money {
-                    cents: amount
-                        .parse()
-                        .expect(&format!("amount ('{}') should be a valid number", amount)),
+            let cell = row[*i];
+            let amounts: Vec<Money> = if cell.starts_with('=') {
+                match Expression::parse(&cell[1..])? {
+                    Expression::Sum(terms) if split_terms => terms.iter().map(Term::eval).collect(),
+                    e => vec![e.eval()],
                 }
+            } else {
+                vec![Money {
+                    cents: cell
+                        .replace(&[',', '.', ' ', '€'], "")
+                        .parse::<i64>()
+                        .map_err(|e| e.to_string())?,
+                }]
             };
-            let entry = MoneyChange {
-                amount: money,
-                date: None,
-                category_id: Some(j),
-            };
-            list.add_entry(year_month, entry)?;
+            for amount in amounts {
+                if amount.cents == 0 {
+                    continue;
+                }
+                let entry = MoneyChange {
+                    amount,
+                    date: None,
+                    category_id: Some(j),
+                };
+                list.add_entry(year_month, entry)?;
+            }
             *i += 1;
         }
     }

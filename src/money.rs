@@ -213,11 +213,11 @@ pub struct MoneyChange {
     pub category_id: Option<usize>,
 }
 
-impl MoneyChange {
-    pub fn category<'a>(&self, list: &'a MoneyList) -> Option<&'a Category> {
-        Some(&list.categories()[self.category_id?])
-    }
-}
+// impl MoneyChange {
+//     pub fn category<'a>(&self, list: &'a MoneyList) -> Option<&'a Category> {
+//         Some(&list.categories()[self.category_id?])
+//     }
+// }
 
 #[derive(Clone, Copy)]
 pub struct Money {
@@ -231,6 +231,18 @@ impl Money {
 
     pub fn is_negative(&self) -> bool {
         self.cents < 0
+    }
+
+    pub fn mult(&self, factor: i64) -> Self {
+        Self {
+            cents: self.cents * factor,
+        }
+    }
+
+    pub fn div(&self, dividend: i64) -> Self {
+        Self {
+            cents: self.cents / dividend,
+        }
     }
 }
 
