@@ -8,6 +8,8 @@ use std::{
 
 use chrono::{Datelike, Month, NaiveDate};
 
+use crate::expressions::Expression;
+
 pub struct Tracker {
     pub total: MoneyList,
     pub incomes: MoneyList,
@@ -64,7 +66,7 @@ impl MoneyList {
     }
 
     pub fn add_entry(&mut self, year_month: YearMonth, entry: MoneyChange) -> Result<(), String> {
-        if !self.allow_negatives && entry.amount.is_negative() {
+        if !self.allow_negatives && entry.amount.eval().is_negative() {
             return Err("A 'total' value cannot be negative".to_owned());
         }
         if !self.allow_dates && entry.date.is_some() {
@@ -99,7 +101,7 @@ impl MoneyList {
     pub fn sum(&self, year_month: &YearMonth) -> Money {
         self.entries
             .get(year_month)
-            .map_or_default(|v| v.iter().map(|mc| mc.amount).sum())
+            .map_or_default(|v| v.iter().map(|mc| mc.amount.eval()).sum())
     }
 
     pub fn sum_category(&self, year_month: &YearMonth, category: usize) -> Money {
@@ -109,7 +111,7 @@ impl MoneyList {
         entries
             .iter()
             .filter(|e| e.category_id.is_some_and(|i| i == category))
-            .map(|mc| mc.amount)
+            .map(|mc| mc.amount.eval())
             .sum()
     }
 
@@ -208,7 +210,7 @@ impl PartialOrd for YearMonth {
 }
 
 pub struct MoneyChange {
-    pub amount: Money,
+    pub amount: Expression,
     pub date: Option<NaiveDate>,
     pub category_id: Option<usize>,
     pub description: Option<String>,

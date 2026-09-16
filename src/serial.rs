@@ -2,7 +2,10 @@ use std::fs;
 
 use chrono::{Month, NaiveDate};
 
-use crate::money::{Category, Money, MoneyChange, MoneyList, Tracker, YearMonth};
+use crate::{
+    expressions::Expression,
+    money::{Category, MoneyChange, MoneyList, Tracker, YearMonth},
+};
 
 pub fn load_file(filename: &str) -> Result<Tracker, String> {
     let json =
@@ -38,8 +41,9 @@ struct YearMonthEntry {
 #[serde_with::skip_serializing_none]
 #[derive(serde::Deserialize, serde::Serialize)]
 struct Entry {
+    #[serde(with = "expr_serde")]
+    amount: Expression,
     category: Option<usize>,
-    amount: i64,
     date: Option<NaiveDate>,
     description: Option<String>,
 }
@@ -73,16 +77,13 @@ impl SerialTracker {
                 month: ym_entry.month,
             };
             for entry in &ym_entry.entries {
-                let amount = Money {
-                    cents: entry.amount,
-                };
                 list.add_entry(
                     ym,
                     MoneyChange {
-                        amount,
+                        amount: entry.amount.clone(),
                         category_id: entry.category,
                         date: entry.date,
-                        description: entry.description.clone()
+                        description: entry.description.clone(),
                     },
                 )?;
             }
@@ -125,7 +126,7 @@ impl SerialTracker {
                     .iter()
                     .map(|mc| Entry {
                         category: mc.category_id,
-                        amount: mc.amount.cents,
+                        amount: mc.amount.clone(),
                         date: mc.date,
                         description: mc.description.clone(),
                     })
@@ -135,5 +136,25 @@ impl SerialTracker {
         for category in money_list.categories() {
             categories.push(category.name.to_owned());
         }
+    }
+}
+
+mod expr_serde {
+    use crate::expressions::Expression;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(value: &Expression, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&value.to_string())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Expression, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse().map_err(serde::de::Error::custom)
     }
 }

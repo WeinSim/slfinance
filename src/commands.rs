@@ -106,7 +106,7 @@ impl Parse for Command {
                 Some(Self::Add(
                     list_type,
                     cat_name,
-                    Expression::parse(formula).ok()?,
+                    formula.parse().ok()?,
                 ))
             }
             "convert" => {

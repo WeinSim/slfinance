@@ -1,7 +1,6 @@
 # SLFinance
 
 ### Continue
-- Change MoneyList to also allow formulas like "1000/2"?
 
 ### Features to add
 - Add incomes / expenses
@@ -15,6 +14,10 @@
 - Encrypted save files?
 - Export graphs
     - Which file format? (pdf, png, svg, html, ascii art)
+
+### Problems to fix
+- SerialTracker is 99% identical to Tracker. I think the only difference is that YearMonth
+is flattened.
 
 ## Frontend
 ???

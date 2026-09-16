@@ -26,7 +26,7 @@ pub fn add(
             month: Month::try_from(date.month() as u8).unwrap(),
         },
         MoneyChange {
-            amount: expression.eval(),
+            amount: expression.clone(),
             date: match list_type {
                 MoneyListType::Total => None,
                 _ => Some(date),

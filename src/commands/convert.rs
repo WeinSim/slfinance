@@ -3,7 +3,7 @@ use std::fs;
 use chrono::Month;
 
 use crate::{
-    expressions::{Expression, Term},
+    expressions::{Expression, Sign},
     money::{Category, Money, MoneyChange, MoneyList, Tracker, YearMonth},
     serial::save_file,
 };
@@ -88,23 +88,31 @@ fn add_list(
         *i = i_initial;
         for j in 0..num {
             let cell = row[*i];
-            let amounts: Vec<Money> = if cell.starts_with('=') {
-                match Expression::parse(&cell[1..])? {
-                    Expression::Sum(terms) if split_terms => terms.iter().map(Term::eval).collect(),
-                    e => vec![e.eval()],
-                }
+            *i += 1;
+            let expression = if cell.starts_with('=') {
+                cell[1..].parse()?
             } else {
-                vec![Money {
+                Expression::Value(Money {
                     cents: cell
                         .replace(&[',', '.', ' ', '€'], "")
                         .parse::<i64>()
                         .map_err(|e| e.to_string())?,
-                }]
+                })
+            };
+            if expression.eval().cents == 0 {
+                continue;
+            }
+            let amounts: Vec<Expression> = match expression {
+                Expression::Sum(terms) if split_terms => terms
+                    .iter()
+                    .map(|t| match t.sign {
+                        Sign::Positive => t.expression.clone(),
+                        Sign::Negative => Expression::Sum(vec![t.clone()]),
+                    })
+                    .collect(),
+                _ => vec![expression],
             };
             for amount in amounts {
-                if amount.cents == 0 {
-                    continue;
-                }
                 let entry = MoneyChange {
                     amount,
                     date: None,
@@ -113,7 +121,6 @@ fn add_list(
                 };
                 list.add_entry(year_month, entry)?;
             }
-            *i += 1;
         }
     }
     Ok(())
