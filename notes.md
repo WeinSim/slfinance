@@ -1,6 +1,7 @@
 # SLFinance
 
 ### Continue
+- Change MoneyList to also allow formulas like "1000/2"?
 
 ### Features to add
 - Add incomes / expenses
@@ -8,9 +9,7 @@
     - How to specify categories?
         - Should categories be mandatory?
         - Specify by index / identifier, which is separate from the display name?
-    - Description for individual expenses
 - List individual expenses
-- Change MoneyList to also allow formulas like "1000/2"?
 - Delete entries
 - Parsing: automatically parse things like args for "add" using FromString trait
 - Encrypted save files?

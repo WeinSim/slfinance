@@ -211,6 +211,7 @@ pub struct MoneyChange {
     pub amount: Money,
     pub date: Option<NaiveDate>,
     pub category_id: Option<usize>,
+    pub description: Option<String>,
 }
 
 // impl MoneyChange {

@@ -16,11 +16,14 @@ Commands:
                             <amount> should be an integer, which is interpreted as euros.
 
 Options:
-    --help, -h              Prints this help message and exists.
+    -h, --help              Prints this help message and exists.
 
-    --version, -v           Prints version and copyright information and exists.
+    -v, --version           Prints version and copyright information and exists.
 
-    --file, -f <file>       Opens the specified file. If this option is not specified, the
+    -f, --file <file>       Opens the specified file. If this option is not specified, the
                             file stored in ~/.slfinance/settings.json is loaded.
 
-    --show-categories, -c   Shows each category in a separate column.
+    -c, --show-categories   Shows each category in a separate column.
+
+    -d, --description <description>
+                            Adds a description when adding an entry.

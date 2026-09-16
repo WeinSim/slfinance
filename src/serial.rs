@@ -41,6 +41,7 @@ struct Entry {
     category: Option<usize>,
     amount: i64,
     date: Option<NaiveDate>,
+    description: Option<String>,
 }
 
 impl SerialTracker {
@@ -81,6 +82,7 @@ impl SerialTracker {
                         amount,
                         category_id: entry.category,
                         date: entry.date,
+                        description: entry.description.clone()
                     },
                 )?;
             }
@@ -125,6 +127,7 @@ impl SerialTracker {
                         category: mc.category_id,
                         amount: mc.amount.cents,
                         date: mc.date,
+                        description: mc.description.clone(),
                     })
                     .collect(),
             })

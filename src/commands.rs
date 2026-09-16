@@ -1,12 +1,12 @@
+mod add;
 mod convert;
 mod list;
 
-use chrono::{Datelike, Local, Month};
-
 use crate::{
     SETTINGS, SETTINGS_PATH,
-    commands::{convert::convert, list::list},
-    money::{Money, MoneyChange, Tracker, YearMonth},
+    commands::{add::add, convert::convert, list::list},
+    expressions::Expression,
+    money::Tracker,
     serial::{self, save_file},
 };
 
@@ -51,14 +51,16 @@ pub enum Argument {
     Help,
     File(String),
     ShowCategories,
+    Description(String),
 }
 
 pub(crate) enum Command {
     List,
-    Add(MoneyListType, String, Money),
+    Add(MoneyListType, String, Expression),
     Convert(String, String),
 }
 
+#[derive(Clone, Copy)]
 pub(crate) enum MoneyListType {
     Total,
     Income,
@@ -74,13 +76,17 @@ trait Parse {
 impl Parse for Argument {
     fn parse(args: &[String], index: &mut usize) -> Option<Self> {
         match args.get(*index)?.as_str() {
-            "--version" | "-v" => Some(Self::Version),
-            "--help" | "-h" => Some(Self::Help),
-            "--file" | "-f" => {
+            "-v" | "--version" => Some(Self::Version),
+            "-h" | "--help" => Some(Self::Help),
+            "-f" | "--file" => {
                 *index += 1;
                 Some(Self::File(args.get(*index)?.to_owned()))
             }
-            "--show-categories" | "-c" => Some(Self::ShowCategories),
+            "-c" | "--show-categories" => Some(Self::ShowCategories),
+            "-d" | "--description" => {
+                *index += 1;
+                Some(Self::Description(args.get(*index)?.to_owned()))
+            }
             _ => None,
         }
     }
@@ -96,8 +102,12 @@ impl Parse for Command {
                 *index += 1;
                 let cat_name = args.get(*index)?.to_owned();
                 *index += 1;
-                let euros = args.get(*index)?.parse::<i64>().ok()?;
-                Some(Self::Add(list_type, cat_name, Money { cents: euros * 100 }))
+                let formula = args.get(*index)?;
+                Some(Self::Add(
+                    list_type,
+                    cat_name,
+                    Expression::parse(formula).ok()?,
+                ))
             }
             "convert" => {
                 *index += 1;
@@ -129,31 +139,13 @@ impl Command {
     pub fn run(&self, args: &[Argument]) -> Result<(), String> {
         match self {
             Self::List => list(args, &load_tracker(args)?),
-            Self::Add(list_type, cat_name, amount) => {
-                let mut tracker = load_tracker(args)?;
-                let date = Local::now().date_naive();
-                let list = match list_type {
-                    MoneyListType::Total => &mut tracker.total,
-                    MoneyListType::Income => &mut tracker.incomes,
-                    MoneyListType::Expense => &mut tracker.expenses,
-                };
-                let cat_id = list.find_or_create_category(cat_name);
-                list.add_entry(
-                    YearMonth {
-                        year: date.year(),
-                        month: Month::try_from(date.month() as u8).unwrap(),
-                    },
-                    MoneyChange {
-                        amount: *amount,
-                        date: match list_type {
-                            MoneyListType::Total => None,
-                            _ => Some(date),
-                        },
-                        category_id: Some(cat_id),
-                    },
-                )?;
-                save_tracker(&tracker)?;
-            }
+            Self::Add(list_type, cat_name, expression) => add(
+                args,
+                &mut load_tracker(args)?,
+                *list_type,
+                cat_name,
+                expression,
+            )?,
             Self::Convert(input_file, output_file) => convert(input_file, output_file)?,
         }
         // save settings file

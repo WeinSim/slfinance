@@ -109,6 +109,7 @@ fn add_list(
                     amount,
                     date: None,
                     category_id: Some(j),
+                    description: None,
                 };
                 list.add_entry(year_month, entry)?;
             }
