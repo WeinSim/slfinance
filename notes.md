@@ -1,10 +1,10 @@
 # SLFinance
 
 ### Continue
+- Properly implement --date and --month arguments
 
 ### Features to add
 - Add incomes / expenses
-    - Set either date or just month
     - How to specify categories?
         - Should categories be mandatory?
         - Specify by index / identifier, which is separate from the display name?
@@ -18,6 +18,7 @@
 ### Problems to fix
 - SerialTracker is 99% identical to Tracker. I think the only difference is that YearMonth
 is flattened.
+- Let argument parsing return an error message (i.e. use Result instead of Option)
 
 ## Frontend
 ???

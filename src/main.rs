@@ -29,9 +29,10 @@ fn main() -> ExitCode {
     if DEV_BUILD {
         sutil::print_num_lines();
     }
-    // println!("{}", "32+21,2*3+24,1+43".parse::<Expression>().unwrap());
-    // ExitCode::SUCCESS
     let args = &std::env::args().collect::<Vec<String>>()[1..];
+    // for arg in args {
+    //     println!("{}", arg);
+    // }
     match run(args) {
         // match convert(args) {
         Ok(()) => ExitCode::SUCCESS,

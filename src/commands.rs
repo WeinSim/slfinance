@@ -2,6 +2,11 @@ mod add;
 mod convert;
 mod list;
 
+use std::collections::HashSet;
+use std::mem::discriminant;
+
+use chrono::{Month, NaiveDate};
+
 use crate::{
     SETTINGS, SETTINGS_PATH,
     commands::{add::add, convert::convert, list::list},
@@ -34,6 +39,38 @@ impl ArgList {
             }
             index += 1;
         }
+        // TODO: may be this whole section can be improved. it looks kind of ugly at the
+        // moment
+
+        // verify that args match the given command, that no arguments are listed more
+        // than once and that arguments don't conflict with each other (e.g. --date
+        // and --month cannot be given together).
+        let mut seen = HashSet::new();
+        for arg in &args {
+            // return None if there are duplicate arguments
+            if !seen.insert(discriminant(arg)) {
+                return None;
+            }
+            // return None if the argument doesn't match the specified command
+            let is_valid = match arg {
+                Argument::Version | Argument::Help => command.is_none(),
+                Argument::File(_) => {
+                    matches!(command, Some(Command::Add(_, _, _)) | Some(Command::List))
+                }
+                Argument::ShowCategories => matches!(command, Some(Command::List)),
+                Argument::Description(_) | Argument::Date(_) => {
+                    matches!(command, Some(Command::Add(_, _, _)))
+                }
+            };
+            if !is_valid {
+                return None;
+            }
+        }
+        if seen.contains(&discriminant(&Argument::Date(None)))
+            && seen.contains(&discriminant(&Argument::Month(Month::January)))
+        {
+            return None;
+        }
         Some(Self { command, args })
     }
 
@@ -46,12 +83,15 @@ impl ArgList {
     }
 }
 
+#[derive(PartialEq, Eq, Hash)]
 pub enum Argument {
     Version,
     Help,
     File(String),
     ShowCategories,
     Description(String),
+    Date(Option<NaiveDate>),
+    Month(Month),
 }
 
 pub(crate) enum Command {
@@ -60,7 +100,7 @@ pub(crate) enum Command {
     Convert(String, String),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MoneyListType {
     Total,
     Income,
@@ -87,6 +127,15 @@ impl Parse for Argument {
                 *index += 1;
                 Some(Self::Description(args.get(*index)?.to_owned()))
             }
+            "-D" | "--date" => {
+                *index += 1;
+                let date = args.get(*index)?;
+                Some(Self::Date(if !date.is_empty() {
+                    Some(date.parse::<NaiveDate>().ok()?)
+                } else {
+                    None
+                }))
+            }
             _ => None,
         }
     }
@@ -103,11 +152,7 @@ impl Parse for Command {
                 let cat_name = args.get(*index)?.to_owned();
                 *index += 1;
                 let formula = args.get(*index)?;
-                Some(Self::Add(
-                    list_type,
-                    cat_name,
-                    formula.parse().ok()?,
-                ))
+                Some(Self::Add(list_type, cat_name, formula.parse().ok()?))
             }
             "convert" => {
                 *index += 1;
@@ -127,9 +172,9 @@ impl Parse for MoneyListType {
         Self: Sized,
     {
         match args.get(*index)?.as_str() {
-            "total" | "t" => Some(Self::Total),
-            "income" | "i" => Some(Self::Income),
-            "expense" | "e" => Some(Self::Expense),
+            "t" | "total" => Some(Self::Total),
+            "i" | "income" => Some(Self::Income),
+            "e" | "expense" => Some(Self::Expense),
             _ => None,
         }
     }
@@ -160,13 +205,10 @@ impl Command {
 }
 
 fn load_tracker(args: &[Argument]) -> Result<Tracker, String> {
-    let mut file_arg: Option<String> = None;
-    for arg in args {
-        match arg {
-            Argument::File(f) => file_arg = Some(f.to_owned()),
-            _ => {}
-        }
-    }
+    let file_arg = args.iter().find_map(|a| match a {
+        Argument::File(f) => Some(f.to_owned()),
+        _ => None,
+    });
     let filename = &file_arg.unwrap_or(
         SETTINGS
             .read()

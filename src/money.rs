@@ -157,6 +157,13 @@ pub struct YearMonth {
 }
 
 impl YearMonth {
+    pub fn from_naive_date(date: NaiveDate) -> Self {
+        Self {
+            year: date.year(),
+            month: Month::try_from(date.month() as u8).unwrap(),
+        }
+    }
+
     pub fn succ(&self) -> Self {
         Self {
             year: if self.month == Month::December {

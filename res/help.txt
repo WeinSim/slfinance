@@ -22,8 +22,21 @@ Options:
 
     -f, --file <file>       Opens the specified file. If this option is not specified, the
                             file stored in ~/.slfinance/settings.json is loaded.
+                            Accepted by 'list' and 'add'.
 
     -c, --show-categories   Shows each category in a separate column.
+                            Accepted by 'add'.
 
     -d, --description <description>
                             Adds a description when adding an entry.
+                            Accepted by 'add'.
+
+    -D, --date <date>       Specifies a date when adding an entry. The date must be in the
+                            format "yyyy-mm-dd". By default, the current date will be
+                            used. Use '--date ""' to insert an entry without a date.
+                            Accepted by 'add'.
+
+    -m --month <month>      Specifies a month when adding an entry. This argument cannot
+                            be used in combinatino with --date. <month> can be either a
+                            number from 1 to 12 or the start of a month, e.g. 'jan' or
+                            'January'. The match is case-insensitive.
