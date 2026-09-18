@@ -14,10 +14,7 @@ mod serial;
 mod settings;
 mod sutil;
 
-use crate::{
-    commands::{ArgList, Argument},
-    settings::Settings,
-};
+use crate::{commands::Arguments, settings::Settings};
 
 const DEV_BUILD: bool = false;
 
@@ -43,28 +40,23 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(args: &[String]) -> Result<(), String> {
-    let arg_list = ArgList::parse(args).ok_or(CONFIG.help_message.clone())?;
+fn run(args_raw: &[String]) -> Result<(), String> {
+    let args = Arguments::parse(args_raw)?;
     // process arguments
     let mut run_command = true;
-    for arg in arg_list.args() {
-        match arg {
-            Argument::Help => {
-                print_help();
-                run_command = false;
-            }
-            Argument::Version => {
-                print_version();
-                run_command = false;
-            }
-            _ => {}
-        }
+    if args.help.is_some_and(|b| b) {
+        print_help();
+        run_command = false;
+    }
+    if args.version.is_some_and(|b| b) {
+        print_version();
+        run_command = false;
     }
     if !run_command {
         return Ok(());
     }
-    if let Some(command) = arg_list.command() {
-        command.run(arg_list.args())
+    if let Some(ref command) = args.command {
+        command.run(&args)
     } else {
         Err(CONFIG.help_message.clone())
     }

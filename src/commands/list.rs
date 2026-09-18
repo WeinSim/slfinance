@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use std::fmt::Write;
 
 use crate::{
-    commands::Argument,
+    commands::Arguments,
     money::{Money, MoneyList, Tracker, YearMonth},
     sutil,
 };
 
-pub fn list(args: &[Argument], tracker: &Tracker) {
-    let show_categories = args.iter().any(|a| matches!(a, Argument::ShowCategories));
+pub fn list(args: &Arguments, tracker: &Tracker) {
+    let show_categories = args.show_categories.unwrap_or(false);
     let year_months = tracker.get_year_months();
     let mut table = Table::new(&year_months);
     table.insert_money_list(&tracker.total, "Total", show_categories, true);
@@ -65,14 +65,15 @@ impl<'a> Header<'a> {
     }
 
     fn get_lines(&mut self, col_width: usize) -> &[&'a str] {
-        match &self.lines {
-            Some((width, lines)) if *width == col_width => lines,
-            _ => {
-                let lines = sutil::split_into_lines(self.name, col_width);
-                self.lines = Some((col_width, lines));
-                &self.lines.as_ref().unwrap().1
-            }
+        if self
+            .lines
+            .as_ref()
+            .is_none_or(|(width, _)| *width != col_width)
+        {
+            let lines = sutil::split_into_lines(self.name, col_width);
+            self.lines = Some((col_width, lines));
         }
+        &self.lines.as_ref().unwrap().1
     }
 
     fn get_num_lines(&mut self, col_width: usize) -> usize {

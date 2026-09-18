@@ -2,96 +2,141 @@ mod add;
 mod convert;
 mod list;
 
-use std::collections::HashSet;
-use std::mem::discriminant;
-
 use chrono::{Month, NaiveDate};
 
 use crate::{
-    SETTINGS, SETTINGS_PATH,
+    CONFIG, SETTINGS, SETTINGS_PATH,
     commands::{add::add, convert::convert, list::list},
     expressions::Expression,
     money::Tracker,
     serial::{self, save_file},
 };
 
-pub struct ArgList {
-    command: Option<Command>,
-    args: Vec<Argument>,
+struct ArgsIter<'a> {
+    args: &'a [String],
+    index: usize,
 }
 
-impl ArgList {
-    pub fn parse(args_raw: &[String]) -> Option<Self> {
-        let mut index: usize = 0;
-        let mut args: Vec<Argument> = Vec::new();
-        let mut command: Option<Command> = None;
-        while index < args_raw.len() {
-            if let Some(arg) = Argument::parse(args_raw, &mut index) {
-                args.push(arg);
-            } else if let Some(cmd) = Command::parse(args_raw, &mut index) {
-                if command.is_some() {
-                    return None;
-                } else {
-                    command = Some(cmd);
-                }
-            } else {
-                return None;
-            }
-            index += 1;
-        }
-        // TODO: may be this whole section can be improved. it looks kind of ugly at the
-        // moment
-
-        // verify that args match the given command, that no arguments are listed more
-        // than once and that arguments don't conflict with each other (e.g. --date
-        // and --month cannot be given together).
-        let mut seen = HashSet::new();
-        for arg in &args {
-            // return None if there are duplicate arguments
-            if !seen.insert(discriminant(arg)) {
-                return None;
-            }
-            // return None if the argument doesn't match the specified command
-            let is_valid = match arg {
-                Argument::Version | Argument::Help => command.is_none(),
-                Argument::File(_) => {
-                    matches!(command, Some(Command::Add(_, _, _)) | Some(Command::List))
-                }
-                Argument::ShowCategories => matches!(command, Some(Command::List)),
-                Argument::Description(_) | Argument::Date(_) => {
-                    matches!(command, Some(Command::Add(_, _, _)))
-                }
-            };
-            if !is_valid {
-                return None;
-            }
-        }
-        if seen.contains(&discriminant(&Argument::Date(None)))
-            && seen.contains(&discriminant(&Argument::Month(Month::January)))
-        {
-            return None;
-        }
-        Some(Self { command, args })
+impl<'a> ArgsIter<'a> {
+    fn new(args: &'a [String]) -> Self {
+        Self { args, index: 0 }
     }
 
-    pub fn args(&self) -> &Vec<Argument> {
-        &self.args
+    fn next(&mut self) -> Option<&str> {
+        if self.index < self.args.len() {
+            let ret = &self.args[self.index];
+            self.index += 1;
+            Some(ret)
+        } else {
+            None
+        }
     }
 
-    pub fn command(&self) -> &Option<Command> {
-        &self.command
+    fn go_back(&mut self) {
+        self.index -= 1;
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
-pub enum Argument {
-    Version,
-    Help,
-    File(String),
-    ShowCategories,
-    Description(String),
-    Date(Option<NaiveDate>),
-    Month(Month),
+#[derive(Default)]
+pub struct Arguments {
+    pub command: Option<Command>,
+    pub version: Option<bool>,
+    pub help: Option<bool>,
+    pub file: Option<String>,
+    pub show_categories: Option<bool>,
+    pub description: Option<String>,
+    pub date: Option<Option<NaiveDate>>,
+    pub month: Option<Month>,
+}
+
+impl Arguments {
+    pub fn parse(args_raw: &[String]) -> Result<Self, String> {
+        let mut iter = ArgsIter::new(args_raw);
+        let mut args = Self::default();
+        if let Some(first) = iter.next() {
+            if !first.starts_with('-') {
+                iter.go_back();
+                args.command = Some(Command::parse(&mut iter)?);
+            }
+        } else {
+            return Err(CONFIG.help_message.clone());
+        }
+        while let Some(arg) = iter.next() {
+            match arg {
+                "-v" | "--version" => Self::set(&mut args.version, true, "version")?,
+                "-h" | "--help" => Self::set(&mut args.help, true, "help")?,
+                "-f" | "--file" => {
+                    Self::set_arg(&mut args.file, &mut iter, Self::parse_str, "file")?
+                }
+                "-c" | "--show-categories" => {
+                    Self::set(&mut args.show_categories, true, "show-categories")?
+                }
+                "-d" | "--description" => {
+                    Self::set_arg(
+                        &mut args.description,
+                        &mut iter,
+                        Self::parse_str,
+                        "description",
+                    )?;
+                }
+                "-D" | "--date" => {
+                    Self::set_arg(
+                        &mut args.date,
+                        &mut iter,
+                        |s| {
+                            if s.is_empty() {
+                                Ok::<_, String>(None)
+                            } else {
+                                Ok(Some(s.parse::<NaiveDate>().map_err(|e| e.to_string())?))
+                            }
+                        },
+                        "date",
+                    )?;
+                }
+                a => return Err(format!("Unknown argument: '{a}'")),
+            }
+        }
+        if args.date.is_some() && args.month.is_some() {
+            return Err("Conflicting arguments '--month' and '--date'".to_owned());
+        }
+        Ok(args)
+    }
+
+    fn set<T>(field: &mut Option<T>, value: T, arg_name: &str) -> Result<(), String> {
+        match field {
+            Some(_) => Err(format!("Duplicate argument '--{arg_name}'")),
+            None => {
+                *field = Some(value);
+                Ok(())
+            }
+        }
+    }
+
+    fn set_arg<T, E>(
+        field: &mut Option<T>,
+        iter: &mut ArgsIter,
+        parse: fn(&str) -> Result<T, E>,
+        arg_name: &str,
+    ) -> Result<(), String>
+    where
+        E: ToString,
+    {
+        Self::set(
+            field,
+            parse(
+                iter.next()
+                    .ok_or(format!("Missing value for '{arg_name}'"))?,
+            )
+            .map_err(|e| e.to_string())?,
+            arg_name,
+        )
+    }
+
+    fn parse_str(s: &str) -> Result<String, String> {
+        Ok(s.to_owned())
+    }
+
+    // fn check_arg<T>(arg: &Option<T>, is_valid: fn(Option<Command>) -> bool, M)
 }
 
 pub(crate) enum Command {
@@ -108,80 +153,55 @@ pub(crate) enum MoneyListType {
 }
 
 trait Parse {
-    fn parse(args: &[String], index: &mut usize) -> Option<Self>
+    fn parse(iter: &mut ArgsIter) -> Result<Self, String>
     where
         Self: Sized;
 }
 
-impl Parse for Argument {
-    fn parse(args: &[String], index: &mut usize) -> Option<Self> {
-        match args.get(*index)?.as_str() {
-            "-v" | "--version" => Some(Self::Version),
-            "-h" | "--help" => Some(Self::Help),
-            "-f" | "--file" => {
-                *index += 1;
-                Some(Self::File(args.get(*index)?.to_owned()))
+impl Command {
+    fn parse(iter: &mut ArgsIter) -> Result<Self, String> {
+        if let Some(command) = iter.next() {
+            match command {
+                "list" => Ok(Self::List),
+                "add" => {
+                    let list_type = MoneyListType::parse(iter)?;
+                    let cat_name = iter.next().ok_or("Expected category name")?.to_owned();
+                    let formula = iter.next().ok_or("Expected formula")?.parse()?;
+                    Ok(Self::Add(list_type, cat_name, formula))
+                }
+                "convert" => {
+                    let input_file = iter.next().ok_or("Expected input file")?.to_owned();
+                    let output_file = iter.next().ok_or("Expected output file")?.to_owned();
+                    Ok(Self::Convert(input_file, output_file))
+                }
+                _ => Err(format!("Invalid command: '{command}'")),
             }
-            "-c" | "--show-categories" => Some(Self::ShowCategories),
-            "-d" | "--description" => {
-                *index += 1;
-                Some(Self::Description(args.get(*index)?.to_owned()))
-            }
-            "-D" | "--date" => {
-                *index += 1;
-                let date = args.get(*index)?;
-                Some(Self::Date(if !date.is_empty() {
-                    Some(date.parse::<NaiveDate>().ok()?)
-                } else {
-                    None
-                }))
-            }
-            _ => None,
-        }
-    }
-}
-
-impl Parse for Command {
-    fn parse(args: &[String], index: &mut usize) -> Option<Self> {
-        match args.get(*index)?.as_str() {
-            "list" => Some(Self::List),
-            "add" => {
-                *index += 1;
-                let list_type = MoneyListType::parse(args, index)?;
-                *index += 1;
-                let cat_name = args.get(*index)?.to_owned();
-                *index += 1;
-                let formula = args.get(*index)?;
-                Some(Self::Add(list_type, cat_name, formula.parse().ok()?))
-            }
-            "convert" => {
-                *index += 1;
-                let input_file = args.get(*index)?.to_owned();
-                *index += 1;
-                let output_file = args.get(*index)?.to_owned();
-                Some(Self::Convert(input_file, output_file))
-            }
-            _ => None,
+        } else {
+            Err("Expected command".to_owned())
         }
     }
 }
 
 impl Parse for MoneyListType {
-    fn parse(args: &[String], index: &mut usize) -> Option<Self>
+    fn parse(iter: &mut ArgsIter) -> Result<Self, String>
     where
         Self: Sized,
     {
-        match args.get(*index)?.as_str() {
-            "t" | "total" => Some(Self::Total),
-            "i" | "income" => Some(Self::Income),
-            "e" | "expense" => Some(Self::Expense),
-            _ => None,
+        if let Some(s) = iter.next() {
+            match s {
+                "t" | "total" => Ok(Self::Total),
+                "i" | "income" => Ok(Self::Income),
+                "e" | "expense" => Ok(Self::Expense),
+                _ => Err(format!("Invalid money list type: '{s}'")),
+            }
+        } else {
+            Err("Expected money list type".to_owned())
         }
     }
 }
 
 impl Command {
-    pub fn run(&self, args: &[Argument]) -> Result<(), String> {
+    pub fn run(&self, args: &Arguments) -> Result<(), String> {
         match self {
             Self::List => list(args, &load_tracker(args)?),
             Self::Add(list_type, cat_name, expression) => add(
@@ -204,12 +224,8 @@ impl Command {
     }
 }
 
-fn load_tracker(args: &[Argument]) -> Result<Tracker, String> {
-    let file_arg = args.iter().find_map(|a| match a {
-        Argument::File(f) => Some(f.to_owned()),
-        _ => None,
-    });
-    let filename = &file_arg.unwrap_or(
+fn load_tracker(args: &Arguments) -> Result<Tracker, String> {
+    let filename = &args.file.clone().unwrap_or(
         SETTINGS
             .read()
             .map_err(|_| "Settings lock poisoned")?

@@ -8,9 +8,10 @@
     - How to specify categories?
         - Should categories be mandatory?
         - Specify by index / identifier, which is separate from the display name?
+- Conversion
+    - Option to convert back from .json to .tsv (or .csv) to import data back in excel
 - List individual expenses
 - Delete entries
-- Parsing: automatically parse things like args for "add" using FromString trait
 - Encrypted save files?
 - Export graphs
     - Which file format? (pdf, png, svg, html, ascii art)
@@ -18,7 +19,7 @@
 ### Problems to fix
 - SerialTracker is 99% identical to Tracker. I think the only difference is that YearMonth
 is flattened.
-- Let argument parsing return an error message (i.e. use Result instead of Option)
+- Check that given aruments actually match the command
 
 ## Frontend
 ???

@@ -1,13 +1,13 @@
 use chrono::Local;
 
 use crate::{
-    commands::{Argument, MoneyListType, save_tracker},
+    commands::{Arguments, MoneyListType, save_tracker},
     expressions::Expression,
     money::{MoneyChange, Tracker, YearMonth},
 };
 
 pub fn add(
-    args: &[Argument],
+    args: &Arguments,
     tracker: &mut Tracker,
     list_type: MoneyListType,
     cat_name: &str,
@@ -19,11 +19,8 @@ pub fn add(
         MoneyListType::Expense => &mut tracker.expenses,
     };
     let cat_id = list.find_or_create_category(cat_name);
-    let date = args.iter().find_map(|a| match a {
-        Argument::Date(d) => Some(d.to_owned()),
-        _ => None,
-    });
     let today = Local::now().date_naive();
+    let date = args.date.unwrap();
     let ym = YearMonth::from_naive_date(date.unwrap_or(today));
     list.add_entry(
         ym,
@@ -35,10 +32,7 @@ pub fn add(
                 date
             },
             category_id: Some(cat_id),
-            description: args.iter().find_map(|a| match a {
-                Argument::Description(d) => Some(d.to_owned()),
-                _ => None,
-            }),
+            description: args.description.clone(),
         },
     )?;
     save_tracker(&tracker)
