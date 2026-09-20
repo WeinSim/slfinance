@@ -160,8 +160,12 @@ impl YearMonth {
     pub fn from_naive_date(date: NaiveDate) -> Self {
         Self {
             year: date.year(),
-            month: Month::try_from(date.month() as u8).unwrap(),
+            month: Self::month_from_naive_date(date),
         }
+    }
+
+    pub fn month_from_naive_date(date: NaiveDate) -> Month {
+        Month::try_from(date.month() as u8).unwrap()
     }
 
     pub fn succ(&self) -> Self {

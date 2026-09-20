@@ -4,22 +4,24 @@
 - Properly implement --date and --month arguments
 
 ### Features to add
-- Add incomes / expenses
+- slf add
     - How to specify categories?
         - Should categories be mandatory?
         - Specify by index / identifier, which is separate from the display name?
-- Conversion
+- slf convert
     - Option to convert back from .json to .tsv (or .csv) to import data back in excel
-- List individual expenses
+- slf list
+    - Individual expenses
+    - Filter by month / year using --month and --year options
 - Delete entries
-- Encrypted save files?
+- Check that given aruments actually match the command
 - Export graphs
     - Which file format? (pdf, png, svg, html, ascii art)
+- Encrypted save files?
 
 ### Problems to fix
 - SerialTracker is 99% identical to Tracker. I think the only difference is that YearMonth
 is flattened.
-- Check that given aruments actually match the command
 
 ## Frontend
 ???

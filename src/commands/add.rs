@@ -1,4 +1,4 @@
-use chrono::Local;
+use chrono::{Datelike, Local};
 
 use crate::{
     commands::{Arguments, MoneyListType, save_tracker},
@@ -20,17 +20,26 @@ pub fn add(
     };
     let cat_id = list.find_or_create_category(cat_name);
     let today = Local::now().date_naive();
-    let date = args.date.unwrap();
-    let ym = YearMonth::from_naive_date(date.unwrap_or(today));
+    let given_ym = if args.month.is_none() && args.year.is_none() {
+        None
+    } else {
+        Some(YearMonth {
+            year: args.year.unwrap_or(today.year()),
+            month: args
+                .month
+                .unwrap_or(YearMonth::month_from_naive_date(today)),
+        })
+    };
+    let date = args.date.unwrap_or(match given_ym {
+        Some(_) => None,
+        None if list_type == MoneyListType::Total => None,
+        None => Some(today),
+    });
     list.add_entry(
-        ym,
+        given_ym.unwrap_or(YearMonth::from_naive_date(date.unwrap_or(today))),
         MoneyChange {
             amount: expression.clone(),
-            date: if date.is_none() && list_type != MoneyListType::Total {
-                Some(today)
-            } else {
-                date
-            },
+            date,
             category_id: Some(cat_id),
             description: args.description.clone(),
         },

@@ -5,6 +5,7 @@ use std::{
     sync::{LazyLock, RwLock},
 };
 
+use chrono::Month;
 use dirs;
 
 mod commands;
@@ -17,6 +18,21 @@ mod sutil;
 use crate::{commands::Arguments, settings::Settings};
 
 const DEV_BUILD: bool = false;
+
+const MONTHS: [Month; 12] = [
+    Month::January,
+    Month::February,
+    Month::March,
+    Month::April,
+    Month::May,
+    Month::June,
+    Month::July,
+    Month::August,
+    Month::September,
+    Month::October,
+    Month::November,
+    Month::December,
+];
 
 static CONFIG: LazyLock<Config> = LazyLock::new(init_config);
 static SETTINGS: LazyLock<RwLock<Settings>> = LazyLock::new(load_settings);

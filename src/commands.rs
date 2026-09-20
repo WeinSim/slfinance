@@ -5,7 +5,7 @@ mod list;
 use chrono::{Month, NaiveDate};
 
 use crate::{
-    CONFIG, SETTINGS, SETTINGS_PATH,
+    CONFIG, MONTHS, SETTINGS, SETTINGS_PATH,
     commands::{add::add, convert::convert, list::list},
     expressions::Expression,
     money::Tracker,
@@ -47,6 +47,7 @@ pub struct Arguments {
     pub description: Option<String>,
     pub date: Option<Option<NaiveDate>>,
     pub month: Option<Month>,
+    pub year: Option<i32>,
 }
 
 impl Arguments {
@@ -80,24 +81,28 @@ impl Arguments {
                     )?;
                 }
                 "-D" | "--date" => {
-                    Self::set_arg(
-                        &mut args.date,
-                        &mut iter,
-                        |s| {
-                            if s.is_empty() {
-                                Ok::<_, String>(None)
-                            } else {
-                                Ok(Some(s.parse::<NaiveDate>().map_err(|e| e.to_string())?))
-                            }
-                        },
-                        "date",
-                    )?;
+                    Self::set_arg(&mut args.date, &mut iter, Self::parse_date, "date")?;
+                }
+                "-m" | "--month" => {
+                    Self::set_arg(&mut args.month, &mut iter, Self::parse_month, "month")?;
+                }
+                "-y" | "--year" => {
+                    Self::set_arg(&mut args.year, &mut iter, str::parse::<i32>, "year")?;
+                }
+                "-my" | "--month-year" => {
+                    Self::set_arg(&mut args.month, &mut iter, Self::parse_month, "month")?;
+                    Self::set_arg(&mut args.year, &mut iter, str::parse::<i32>, "year")?;
                 }
                 a => return Err(format!("Unknown argument: '{a}'")),
             }
         }
-        if args.date.is_some() && args.month.is_some() {
-            return Err("Conflicting arguments '--month' and '--date'".to_owned());
+        if args.date.is_some() {
+            if args.month.is_some() {
+                return Err("Conflicting arguments '--date' and '--month'".to_owned());
+            }
+            if args.year.is_some() {
+                return Err("Conflicting arguments '--date' and '--year'".to_owned());
+            }
         }
         Ok(args)
     }
@@ -127,7 +132,7 @@ impl Arguments {
                 iter.next()
                     .ok_or(format!("Missing value for '{arg_name}'"))?,
             )
-            .map_err(|e| e.to_string())?,
+            .map_err(|e| format!("Unable to parse arg '{}': {}", arg_name, e.to_string()))?,
             arg_name,
         )
     }
@@ -136,7 +141,35 @@ impl Arguments {
         Ok(s.to_owned())
     }
 
-    // fn check_arg<T>(arg: &Option<T>, is_valid: fn(Option<Command>) -> bool, M)
+    fn parse_date(s: &str) -> Result<Option<NaiveDate>, String> {
+        if s.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(s.parse::<NaiveDate>().map_err(|e| e.to_string())?))
+        }
+    }
+
+    fn parse_month(s: &str) -> Result<Month, String> {
+        // first check if input is a valid month number (1 - 12)
+        match s.parse::<u8>() {
+            Ok(i) => {
+                if let Ok(month) = Month::try_from(i) {
+                    return Ok(month);
+                }
+            }
+            _ => {}
+        }
+        // then check if input is a unique prefix of a month (case-insensitive)
+        let s_lower = s.to_ascii_lowercase();
+        let matches: Vec<&Month> = MONTHS
+            .iter()
+            .filter(|m| m.name().to_ascii_lowercase().starts_with(&s_lower))
+            .collect();
+        match matches.len() {
+            1 => Ok(*matches[0]),
+            _ => Err(format!("Invalid month: {s}")),
+        }
+    }
 }
 
 pub(crate) enum Command {

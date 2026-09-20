@@ -31,12 +31,26 @@ Options:
                             Adds a description when adding an entry.
                             Accepted by 'add'.
 
-    -D, --date <date>       Specifies a date when adding an entry. The date must be in the
-                            format "yyyy-mm-dd". By default, the current date will be
-                            used. Use '--date ""' to insert an entry without a date.
+    -D, --date <date>       Specifies a date when adding an entry. <date> must be in the
+                            format "yyyy-mm-dd". Without this option, the current date
+                            will be used. Use '--date ""' to insert an entry without a
+                            date. The date must be between Jan 1, 262145 BCE and Dec 31,
+                            262143 CE, inclusive.
                             Accepted by 'add'.
 
-    -m --month <month>      Specifies a month when adding an entry. This argument cannot
-                            be used in combinatino with --date. <month> can be either a
-                            number from 1 to 12 or the start of a month, e.g. 'jan' or
-                            'January'. The match is case-insensitive.
+    -m, --month <month>     Specifies a month when adding an entry. This argument cannot
+                            be used in combination with --date. <month> can be either a
+                            number from 1 to 12 or the start of a month name, e.g. 'jan'
+                            or 'January'. The match is case-insensitive. The given month
+                            will be combined with the current year.
+                            Accepted by 'add'.
+
+    -y, --year <year>       Specifies a year when adding an entry. This argument cannot be
+                            used in combination with --date. <year> can be any integer
+                            between -2147483648 and +2147483647 inclusive. The given year
+                            will be combined with the current month.
+                            Accepted by 'add'.
+
+    -my, --month-year <month> <year>
+                            Combination of --month and --year.
+                            Accepted by 'add'.
