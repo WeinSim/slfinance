@@ -2,13 +2,13 @@ mod add;
 mod convert;
 mod list;
 
-use chrono::{Month, NaiveDate};
+use chrono::{Datelike, Local, Month, NaiveDate};
 
 use crate::{
     CONFIG, MONTHS, SETTINGS, SETTINGS_PATH,
     commands::{add::add, convert::convert, list::list},
     expressions::Expression,
-    money::Tracker,
+    money::{Tracker, YearMonth},
     serial::{self, save_file},
 };
 
@@ -32,8 +32,8 @@ impl<'a> ArgsIter<'a> {
         }
     }
 
-    fn go_back(&mut self) {
-        self.index -= 1;
+    fn peek(&self) -> Option<&String> {
+        self.args.get(self.index)
     }
 }
 
@@ -44,6 +44,9 @@ pub struct Arguments {
     pub help: Option<bool>,
     pub file: Option<String>,
     pub show_categories: Option<bool>,
+    pub total: bool,
+    pub incomes: bool,
+    pub expenses: bool,
     pub description: Option<String>,
     pub date: Option<Option<NaiveDate>>,
     pub month: Option<Month>,
@@ -51,12 +54,25 @@ pub struct Arguments {
 }
 
 impl Arguments {
+    pub fn get_year_month(&self) -> Option<YearMonth> {
+        let today = Local::now().date_naive();
+        if self.month.is_none() && self.year.is_none() {
+            None
+        } else {
+            Some(YearMonth {
+                year: self.year.unwrap_or(today.year()),
+                month: self
+                    .month
+                    .unwrap_or(YearMonth::month_from_naive_date(today)),
+            })
+        }
+    }
+
     pub fn parse(args_raw: &[String]) -> Result<Self, String> {
         let mut iter = ArgsIter::new(args_raw);
         let mut args = Self::default();
-        if let Some(first) = iter.next() {
+        if let Some(first) = iter.peek() {
             if !first.starts_with('-') {
-                iter.go_back();
                 args.command = Some(Command::parse(&mut iter)?);
             }
         } else {
@@ -72,6 +88,10 @@ impl Arguments {
                 "-c" | "--show-categories" => {
                     Self::set(&mut args.show_categories, true, "show-categories")?
                 }
+                // no duplicate checks for these three
+                "-t" | "--total" => args.total = true,
+                "-i" | "--incomes" => args.incomes = true,
+                "-e" | "--expenses" => args.expenses = true,
                 "-d" | "--description" => {
                     Self::set_arg(
                         &mut args.description,
@@ -87,21 +107,26 @@ impl Arguments {
                     Self::set_arg(&mut args.month, &mut iter, Self::parse_month, "month")?;
                 }
                 "-y" | "--year" => {
-                    Self::set_arg(&mut args.year, &mut iter, str::parse::<i32>, "year")?;
+                    Self::set_arg(&mut args.year, &mut iter, Self::parse_year, "year")?;
                 }
                 "-my" | "--month-year" => {
                     Self::set_arg(&mut args.month, &mut iter, Self::parse_month, "month")?;
-                    Self::set_arg(&mut args.year, &mut iter, str::parse::<i32>, "year")?;
+                    Self::set_arg(&mut args.year, &mut iter, Self::parse_year, "year")?;
                 }
-                a => return Err(format!("Unknown argument: '{a}'")),
+                a => return Err(format!("unknown argument: '{a}'")),
             }
+        }
+        if !(args.total || args.incomes || args.expenses) {
+            args.total = true;
+            args.incomes = true;
+            args.expenses = true;
         }
         if args.date.is_some() {
             if args.month.is_some() {
-                return Err("Conflicting arguments '--date' and '--month'".to_owned());
+                return Err("conflicting arguments '--date' and '--month'".to_owned());
             }
             if args.year.is_some() {
-                return Err("Conflicting arguments '--date' and '--year'".to_owned());
+                return Err("conflicting arguments '--date' and '--year'".to_owned());
             }
         }
         Ok(args)
@@ -109,7 +134,7 @@ impl Arguments {
 
     fn set<T>(field: &mut Option<T>, value: T, arg_name: &str) -> Result<(), String> {
         match field {
-            Some(_) => Err(format!("Duplicate argument '--{arg_name}'")),
+            Some(_) => Err(format!("duplicate argument '--{arg_name}'")),
             None => {
                 *field = Some(value);
                 Ok(())
@@ -130,9 +155,9 @@ impl Arguments {
             field,
             parse(
                 iter.next()
-                    .ok_or(format!("Missing value for '{arg_name}'"))?,
+                    .ok_or(format!("missing value for '{arg_name}'"))?,
             )
-            .map_err(|e| format!("Unable to parse arg '{}': {}", arg_name, e.to_string()))?,
+            .map_err(|e| format!("unable to parse arg '{}': {}", arg_name, e.to_string()))?,
             arg_name,
         )
     }
@@ -151,13 +176,10 @@ impl Arguments {
 
     fn parse_month(s: &str) -> Result<Month, String> {
         // first check if input is a valid month number (1 - 12)
-        match s.parse::<u8>() {
-            Ok(i) => {
-                if let Ok(month) = Month::try_from(i) {
-                    return Ok(month);
-                }
-            }
-            _ => {}
+        if let Ok(i) = s.parse::<u8>()
+            && let Ok(month) = Month::try_from(i)
+        {
+            return Ok(month);
         }
         // then check if input is a unique prefix of a month (case-insensitive)
         let s_lower = s.to_ascii_lowercase();
@@ -167,22 +189,37 @@ impl Arguments {
             .collect();
         match matches.len() {
             1 => Ok(*matches[0]),
-            _ => Err(format!("Invalid month: {s}")),
+            0 => Err(format!("invalid month: '{s}'")),
+            _ => Err(format!("month is not unique: '{s}'")),
         }
+    }
+
+    fn parse_year(s: &str) -> Result<i32, String> {
+        let parsed = s.parse::<i32>().map_err(|e| e.to_string());
+        if s.starts_with('0') {
+            return parsed;
+        }
+        let current_year = Local::now().date_naive().year();
+        let current_century = (current_year / 100) * 100;
+        Ok(match parsed? {
+            y if y <= current_year % 100 => y + current_century,
+            y if y < 100 => y + current_century - 100,
+            y => y,
+        })
     }
 }
 
 pub(crate) enum Command {
     List,
-    Add(MoneyListType, String, Expression),
+    Add(String, Expression),
     Convert(String, String),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MoneyListType {
     Total,
-    Income,
-    Expense,
+    Incomes,
+    Expenses,
 }
 
 trait Parse {
@@ -191,44 +228,25 @@ trait Parse {
         Self: Sized;
 }
 
-impl Command {
+impl Parse for Command {
     fn parse(iter: &mut ArgsIter) -> Result<Self, String> {
         if let Some(command) = iter.next() {
             match command {
                 "list" => Ok(Self::List),
                 "add" => {
-                    let list_type = MoneyListType::parse(iter)?;
                     let cat_name = iter.next().ok_or("Expected category name")?.to_owned();
                     let formula = iter.next().ok_or("Expected formula")?.parse()?;
-                    Ok(Self::Add(list_type, cat_name, formula))
+                    Ok(Self::Add(cat_name, formula))
                 }
                 "convert" => {
                     let input_file = iter.next().ok_or("Expected input file")?.to_owned();
                     let output_file = iter.next().ok_or("Expected output file")?.to_owned();
                     Ok(Self::Convert(input_file, output_file))
                 }
-                _ => Err(format!("Invalid command: '{command}'")),
+                _ => Err(format!("invalid command: '{command}'")),
             }
         } else {
-            Err("Expected command".to_owned())
-        }
-    }
-}
-
-impl Parse for MoneyListType {
-    fn parse(iter: &mut ArgsIter) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        if let Some(s) = iter.next() {
-            match s {
-                "t" | "total" => Ok(Self::Total),
-                "i" | "income" => Ok(Self::Income),
-                "e" | "expense" => Ok(Self::Expense),
-                _ => Err(format!("Invalid money list type: '{s}'")),
-            }
-        } else {
-            Err("Expected money list type".to_owned())
+            Err("expected command".to_owned())
         }
     }
 }
@@ -237,13 +255,26 @@ impl Command {
     pub fn run(&self, args: &Arguments) -> Result<(), String> {
         match self {
             Self::List => list(args, &load_tracker(args)?),
-            Self::Add(list_type, cat_name, expression) => add(
-                args,
-                &mut load_tracker(args)?,
-                *list_type,
-                cat_name,
-                expression,
-            )?,
+            Self::Add(cat_name, expression) => {
+                let list_type = match (&args.total, &args.incomes, &args.expenses) {
+                    (true, false, false) => MoneyListType::Total,
+                    (false, true, false) => MoneyListType::Incomes,
+                    (false, false, true) => MoneyListType::Expenses,
+                    _ => {
+                        return Err(
+                            "must specify exactly one of --total, --incomes or --expenses"
+                                .to_owned(),
+                        );
+                    }
+                };
+                add(
+                    args,
+                    &mut load_tracker(args)?,
+                    list_type,
+                    cat_name,
+                    expression,
+                )?;
+            }
             Self::Convert(input_file, output_file) => convert(input_file, output_file)?,
         }
         // save settings file
@@ -282,6 +313,6 @@ fn save_tracker(tracker: &Tracker) -> Result<(), String> {
         Some(filename) => {
             save_file(&filename, tracker).map_err(|msg| format!("Unable to save file: {msg}"))
         }
-        None => Err("Unable to find path to save the file. No changes can be saved.".to_owned()),
+        None => Err("unable to find path to save the file. no changes can be saved.".to_owned()),
     }
 }

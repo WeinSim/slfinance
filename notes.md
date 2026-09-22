@@ -1,18 +1,15 @@
 # SLFinance
 
 ### Continue
-- Properly implement --date and --month arguments
 
 ### Features to add
+- Allow shorter version of single-letter arguments: 'slf -abc' for 'slf -a -b -c'
 - slf add
     - How to specify categories?
         - Should categories be mandatory?
         - Specify by index / identifier, which is separate from the display name?
 - slf convert
     - Option to convert back from .json to .tsv (or .csv) to import data back in excel
-- slf list
-    - Individual expenses
-    - Filter by month / year using --month and --year options
 - Delete entries
 - Check that given aruments actually match the command
 - Export graphs

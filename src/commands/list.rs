@@ -1,42 +1,128 @@
 use owo_colors::OwoColorize;
-use std::collections::HashMap;
-use std::fmt::Write;
+use std::fmt::{Display, Write};
+use std::{collections::HashMap, hash::Hash};
 
+use crate::money::MoneyChange;
 use crate::{
     commands::Arguments,
     money::{Money, MoneyList, Tracker, YearMonth},
     sutil,
 };
 
+const MONEY_COL_WIDTH: usize = 13;
+const DATE_COL_WIDTH: usize = 10;
+const CATEGORY_COL_WIDTH: usize = 30;
+const DESCRIPTION_COL_WIDTH: usize = 30;
+
 pub fn list(args: &Arguments, tracker: &Tracker) {
+    match args.get_year_month() {
+        Some(ym) => list_ym(args, tracker, ym),
+        None => list_all(args, tracker),
+    }
+}
+
+fn list_all(args: &Arguments, tracker: &Tracker) {
     let show_categories = args.show_categories.unwrap_or(false);
     let year_months = tracker.get_year_months();
-    let mut table = Table::new(&year_months);
-    table.insert_money_list(&tracker.total, "Total", show_categories, true);
-    // table.add_separator();
-    table.add_column("Change", true, |ym| tracker.get_total_change(ym), true);
-    table.add_column("Diff", true, |ym| tracker.get_diff_total_change(ym), true);
-    table.add_column(
+    let mut table = Table::new(RowKey::from_year_months(&year_months));
+    if args.total {
+        table.add_money_list(&tracker.total, "Total", show_categories, true);
+    }
+    table.add_money_column("Change", true, |ym| tracker.get_total_change(ym), true);
+    table.add_money_column("Diff", true, |ym| tracker.get_diff_total_change(ym), true);
+    table.add_money_column(
         "Expected",
         true,
         |ym| tracker.get_expected_total_change(ym),
         true,
     );
-    table.insert_money_list(&tracker.incomes, "Incomes", show_categories, false);
-    table.insert_money_list(&tracker.expenses, "Expenses", show_categories, false);
-    let month_width: usize = 3;
-    let year_width: usize = 4;
-    let pad_left: usize = 2;
+    if args.incomes {
+        table.add_money_list(&tracker.incomes, "Incomes", show_categories, false);
+    }
+    if args.expenses {
+        table.add_money_list(&tracker.expenses, "Expenses", show_categories, false);
+    }
+    let ym_width: usize = 8;
+    let month_prec: usize = 3;
     // can fit at most -999,999.99€
-    let col_width: usize = 13;
     let pad: usize = 2;
-    table.print(month_width, year_width, pad_left, col_width, pad);
+    table.print(ym_width, month_prec, pad);
 }
 
-struct Table<'a> {
-    headers: Vec<Header<'a>>,
-    cells: HashMap<YearMonth, Vec<Cell>>,
-    row_keys: Vec<RowKey>,
+fn list_ym(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
+    // prepare money lists
+    let initial_lists = [
+        (args.total, &tracker.total, "Total"),
+        (args.incomes, &tracker.incomes, "Incomes"),
+        (args.expenses, &tracker.expenses, "Expenses"),
+    ];
+    let initial_lists: Vec<_> = if initial_lists.iter().any(|(a, _, _)| *a) {
+        initial_lists
+            .iter()
+            .filter_map(|(a, l, n)| if *a { Some((*l, *n)) } else { None })
+            .collect()
+    } else {
+        initial_lists.iter().map(|(_, l, n)| (*l, *n)).collect()
+    };
+    let lists: Vec<(&MoneyList, &Vec<MoneyChange>, &str)> = initial_lists
+        .iter()
+        .map(|(l, n)| (l, l.entries().get(&year_month), n))
+        .filter_map(|(l, o, n)| o.as_ref().map(|v| (*l, *v, *n)))
+        .collect();
+    // create table
+    let mut table = Table::with_num_rows(
+        lists
+            .iter()
+            .map(|(_, v, _)| v.len())
+            .max()
+            .unwrap_or_default(),
+    );
+    let mut money_indices = Vec::<usize>::new();
+    for (list, vec, name) in &lists {
+        money_indices.push(table.add_money_list(list, vec, name));
+    }
+    // print year and month
+    println!("{} {}", year_month.month.name(), year_month.year);
+    // print table
+    let pad: usize = 2;
+    table.print(0, 0, pad);
+    if table.is_empty() {
+        return;
+    }
+    // print sums
+    let sums: Vec<Money> = lists
+        .iter()
+        .map(|(_, v, _)| v.iter().map(|mc| mc.amount.eval()).sum())
+        .collect();
+    let max_index = money_indices.iter().max().unwrap();
+    let mut row1 = vec![Cell::Empty; *max_index + 1];
+    let mut row2 = vec![Cell::Empty; *max_index + 1];
+    for (i, c) in money_indices.iter().enumerate() {
+        row1[*c] = Cell::Text {
+            text: "Sum".to_owned(),
+            bold: true,
+        };
+        row2[*c] = Cell::Money {
+            money: sums[i],
+            color: false,
+        };
+    }
+    table.print_row(&row1, pad);
+    table.print_row(&row2, pad);
+}
+
+struct Table<'a, K>
+where
+    K: Eq + Hash + Display,
+{
+    columns: Vec<Column<'a>>,
+    cells: HashMap<K, Vec<Cell>>,
+    row_keys: Vec<RowKey<K>>,
+}
+
+struct Column<'a> {
+    header: Header<'a>,
+    width: usize,
 }
 
 struct Header<'a> {
@@ -45,14 +131,84 @@ struct Header<'a> {
     lines: Option<(usize, Vec<&'a str>)>,
 }
 
-struct Cell {
-    money: Money,
-    color: bool,
+enum RowKey<K> {
+    Key(K),
+    Dots,
 }
 
-enum RowKey {
-    YearMonth(YearMonth),
-    Dots,
+#[derive(Clone, Default)]
+enum Cell {
+    Money {
+        money: Money,
+        color: bool,
+    },
+    Text {
+        text: String,
+        bold: bool,
+    },
+    #[default]
+    Empty,
+}
+
+impl Cell {
+    fn print(&self, col_width: usize) {
+        match self {
+            Self::Money { money, color } => {
+                let mut fmt = String::with_capacity(col_width);
+                match write!(&mut fmt, "{:>#col_width$.col_width$}", money) {
+                    Ok(_) => {}
+                    Err(e) => println!("{}", e),
+                }
+                match money {
+                    m if *color && m.is_positive() => print!("{}", fmt.green()),
+                    m if *color && m.is_negative() => print!("{}", fmt.bright_red()),
+                    _ => print!("{}", fmt),
+                }
+            }
+            Self::Text { text, bold } => {
+                let mut text_to_print = String::with_capacity(col_width);
+                match col_width {
+                    w if w >= text.chars().count() => text_to_print.push_str(text),
+                    w => {
+                        let nth_char = text.char_indices().nth(w - 3).unwrap().0;
+                        text_to_print.push_str(&text[..nth_char]);
+                        text_to_print.push_str("...");
+                    }
+                };
+                if *bold {
+                    print!("{:col_width$}", text_to_print.bold());
+                } else {
+                    print!("{:col_width$}", text_to_print);
+                }
+            }
+            Self::Empty => print!("{:col_width$}", ""),
+        }
+    }
+}
+
+impl RowKey<YearMonth> {
+    fn from_year_months(year_months: &[YearMonth]) -> Vec<Self> {
+        let mut row_keys: Vec<_> = year_months.iter().map(|ym| RowKey::Key(*ym)).collect();
+        let mut i: usize = 0;
+        while i < row_keys.len() - 1 {
+            // the let statement and the if statement are separate because we need a
+            // mutable borrow of row_keys to insert elements, which is not possible while
+            // we are holding two immutable references to values inside of row_keys.
+            let to_insert: Option<(YearMonth, YearMonth)> = match (&row_keys[i], &row_keys[i + 1]) {
+                (RowKey::Key(current), RowKey::Key(next)) if next - current > 2 => {
+                    Some((current.succ(), next.pred()))
+                }
+                _ => None,
+            };
+            if let Some((ym1, ym2)) = to_insert {
+                row_keys.insert(i + 1, RowKey::Key(ym1));
+                row_keys.insert(i + 2, RowKey::Dots);
+                row_keys.insert(i + 3, RowKey::Key(ym2));
+            }
+            i += 1;
+        }
+        row_keys
+    }
 }
 
 impl<'a> Header<'a> {
@@ -91,138 +247,81 @@ impl<'a> Header<'a> {
             print!("{:<col_width$.col_width$}", line);
         }
     }
-
-    // fn print(&self, col_width: usize) {
-    //     // we have to copy the name even if it is short enough because we cannot hand back
-    //     // a reference to buf (since it doesn't live long enough)
-    //     let num_chars = self.name.chars().count();
-    //     let name_to_print = if num_chars <= col_width {
-    //         self.name.to_owned()
-    //     } else {
-    //         let mut buf = match self.name.char_indices().nth(col_width - 3) {
-    //             Some((i, _)) => self.name[0..i].to_owned(),
-    //             None => self.name.to_owned(),
-    //         };
-    //         buf.push_str("...");
-    //         buf
-    //     };
-    //     if self.bold {
-    //         print!("{:>col_width$.col_width$}", name_to_print.bold());
-    //     } else {
-    //         print!("{:>col_width$.col_width$}", name_to_print);
-    //     }
-    // }
 }
 
-impl<'a> Table<'a> {
-    fn new(year_months: &Vec<YearMonth>) -> Self {
-        // pad year_months to fill in gaps
-        // // doing a double reverse gives constant O(n) time complexity, instead of
-        // // best-case O(1) (if no Dots have to be inserted at all) and worst-case O(n^2)
-        // // (if Dots have to be inserted) at every other slot).
-        // // let mut reversed = year_months
-        //     .iter()
-        //     .rev()
-        //     .map(|ym| RowKey::YearMonth(*ym))
-        //     .collect::<Vec<_>>();
-        // while let Some(row_key) = reversed.pop() {
-        //     row_keys.push(row_key);
-        // }
-        let mut row_keys: Vec<_> = year_months
-            .iter()
-            .map(|ym| RowKey::YearMonth(*ym))
-            .collect();
-        let mut i: usize = 0;
-        while i < row_keys.len() - 1 {
-            // the let statement and the if statement are separate because we need a
-            // mutable borrow of row_keys to insert elements, which is not possible while
-            // we are holding two immutable references to values inside of row_keys.
-            let to_insert: Option<(YearMonth, YearMonth)> = match (&row_keys[i], &row_keys[i + 1]) {
-                (RowKey::YearMonth(current), RowKey::YearMonth(next)) if next - current > 2 => {
-                    Some((current.succ(), next.pred()))
-                }
-                _ => None,
-            };
-            if let Some((ym1, ym2)) = to_insert {
-                row_keys.insert(i + 1, RowKey::YearMonth(ym1));
-                row_keys.insert(i + 2, RowKey::Dots);
-                row_keys.insert(i + 3, RowKey::YearMonth(ym2));
-            }
-            i += 1;
-        }
+impl<'a, K> Table<'a, K>
+where
+    K: Clone + Eq + Hash + Display,
+{
+    fn new(row_keys: Vec<RowKey<K>>) -> Self {
         Self {
-            headers: Vec::new(),
+            columns: Vec::new(),
             cells: HashMap::new(),
             row_keys,
         }
     }
 
-    fn add_column<F>(&mut self, name: &'a str, bold: bool, entries: F, color: bool)
+    fn add_column<F>(&mut self, name: &'a str, bold: bool, width: usize, cells: F)
     where
-        F: Fn(&YearMonth) -> Money,
+        F: Fn(&K) -> Cell,
     {
-        self.headers.push(Header::new(name, bold));
+        self.columns.push(Column {
+            header: Header::new(name, bold),
+            width,
+        });
         for key in &self.row_keys {
-            if let RowKey::YearMonth(year_month) = key {
-                self.cells.entry(*year_month).or_default().push(Cell {
-                    money: entries(year_month),
-                    color,
-                });
+            if let RowKey::Key(k) = key {
+                self.cells.entry(k.clone()).or_default().push(cells(k));
             }
         }
     }
 
-    fn insert_money_list(
-        &mut self,
-        money_list: &'a MoneyList,
-        name: &'a str,
-        show_categories: bool,
-        sum_last: bool,
-    ) {
-        // headers
-        if !sum_last {
-            self.add_column(name, true, |ym| money_list.sum(ym), false);
-        }
-        if show_categories {
-            for (i, category) in money_list.categories().iter().enumerate() {
-                self.add_column(
-                    &category.name,
-                    false,
-                    |ym| money_list.sum_category(ym, i),
-                    false,
-                );
-            }
-        }
-        if sum_last {
-            self.add_column(name, true, |ym| money_list.sum(ym), false);
-        }
+    fn add_money_column<F>(&mut self, name: &'a str, bold: bool, entries: F, color: bool)
+    where
+        F: Fn(&K) -> Money,
+    {
+        self.add_column(name, bold, MONEY_COL_WIDTH, |k| Cell::Money {
+            money: entries(k),
+            color,
+        });
     }
 
-    fn print(
-        &mut self,
-        month_width: usize,
-        year_width: usize,
-        pad_left: usize,
-        col_width: usize,
-        pad: usize,
-    ) {
-        if self.headers.is_empty() || self.row_keys.is_empty() {
+    fn add_text_column<F>(&mut self, name: &'a str, bold: bool, width: usize, cells: F)
+    where
+        F: Fn(&K) -> Option<String>,
+    {
+        self.add_column(name, bold, width, |k| match cells(k) {
+            Some(text) => Cell::Text { text, bold: false },
+            None => Cell::Empty,
+        })
+    }
+
+    fn is_empty(&self) -> bool {
+        self.columns.is_empty() || self.row_keys.is_empty()
+    }
+
+    fn print(&mut self, key_width: usize, key_prec: usize, pad: usize) {
+        if self.is_empty() {
             println!("[empty]");
             return;
         }
         // print headers
-        let num_headers = self.headers.len();
+        let num_headers = self.columns.len();
         let num_header_rows = self
-            .headers
+            .columns
             .iter_mut()
-            .map(|h| h.get_num_lines(col_width))
+            .map(|c| c.header.get_num_lines(c.width))
             .max()
             .unwrap();
         for i in 0..num_header_rows {
-            print!("{:month_width$} {:year_width$}{:pad_left$}", "", "", "");
-            for (j, header) in self.headers.iter_mut().enumerate() {
-                let offset = num_header_rows - header.get_num_lines(col_width);
-                header.print_line(i.wrapping_sub(offset), col_width);
+            if key_width > 0 {
+                print!("{:key_width$}{:pad$}", "", "");
+            }
+            for (j, column) in self.columns.iter_mut().enumerate() {
+                let offset = num_header_rows - column.header.get_num_lines(column.width);
+                column
+                    .header
+                    .print_line(i.wrapping_sub(offset), column.width);
                 if j < num_headers - 1 {
                     print!("{:pad$}", "");
                 }
@@ -235,37 +334,102 @@ impl<'a> Table<'a> {
         // print actual rows
         for key in &self.row_keys {
             match key {
-                RowKey::YearMonth(year_month) => {
-                    let year = year_month.year;
-                    let month = year_month.month;
-                    print!(
-                        "{:month_width$} {:year_width$}{:pad_left$}",
-                        &month.name()[..3],
-                        year,
-                        ""
-                    );
-                    let Some(row) = self.cells.get(&year_month) else {
+                RowKey::Key(key) => {
+                    if key_width > 0 {
+                        print!("{:key_prec$.key_prec$}{:pad$}", key, "");
+                    }
+                    let Some(row) = self.cells.get(key) else {
+                        // this should never happen as values are always inserted for
+                        // every row key
+                        println!("[no row for key {}]", key);
                         continue;
                     };
-                    for (j, cell) in row.iter().enumerate() {
-                        let mut fmt = String::with_capacity(col_width);
-                        match write!(&mut fmt, "{:>#col_width$.col_width$}", cell.money) {
-                            Ok(_) => {}
-                            Err(e) => println!("{}", e.to_string()),
-                        }
-                        match cell.money {
-                            m if cell.color && m.is_positive() => print!("{}", fmt.green()),
-                            m if cell.color && m.is_negative() => print!("{}", fmt.bright_red()),
-                            _ => print!("{}", fmt),
-                        }
-                        if j < row.len() - 1 {
-                            print!("{:pad$}", "");
-                        }
-                    }
-                    println!();
+                    self.print_row(row, pad);
                 }
                 RowKey::Dots => println!("..."),
             }
         }
+    }
+
+    fn print_row(&self, row: &[Cell], pad: usize) {
+        for (j, cell) in row.iter().enumerate() {
+            cell.print(self.columns[j].width);
+            if j < row.len() - 1 {
+                print!("{:pad$}", "");
+            }
+        }
+        println!();
+    }
+}
+
+impl<'a> Table<'a, YearMonth> {
+    fn add_money_list(
+        &mut self,
+        money_list: &'a MoneyList,
+        name: &'a str,
+        show_categories: bool,
+        sum_last: bool,
+    ) {
+        // headers
+        if !sum_last {
+            self.add_money_column(name, true, |ym| money_list.sum(ym), false);
+        }
+        if show_categories {
+            for (i, category) in money_list.categories().iter().enumerate() {
+                self.add_money_column(
+                    &category.name,
+                    false,
+                    |ym| money_list.sum_category(ym, i),
+                    false,
+                );
+            }
+        }
+        if sum_last {
+            self.add_money_column(name, true, |ym| money_list.sum(ym), false);
+        }
+    }
+}
+
+impl<'a> Table<'a, usize> {
+    fn with_num_rows(num_rows: usize) -> Self {
+        Self::new((0..num_rows).map(RowKey::Key).collect())
+    }
+
+    fn add_money_list(
+        &mut self,
+        money_list: &MoneyList,
+        entries: &[MoneyChange],
+        name: &'a str,
+    ) -> usize {
+        let money_index = self.columns.len();
+        self.add_column(name, true, MONEY_COL_WIDTH, |i| {
+            entries
+                .get(*i)
+                .map(|mc| Cell::Money {
+                    money: mc.amount.eval(),
+                    color: false,
+                })
+                .unwrap_or_default()
+        });
+        if money_list.allow_dates() {
+            self.add_text_column("Date", false, DATE_COL_WIDTH, |i| {
+                entries
+                    .get(*i)
+                    .and_then(|mc| mc.date)
+                    .map(|d| d.to_string())
+            });
+        }
+        self.add_text_column("Category", false, CATEGORY_COL_WIDTH, |i| {
+            entries
+                .get(*i)
+                .and_then(|mc| mc.category_id)
+                .map(|i| money_list.categories()[i].name.clone())
+        });
+        // let min_desc_width = entries.iter().filter_map(|mc| mc.description.clone()).map(|d| d.len()).max().unwrap_or_default();
+        // let col_width = usize::clamp(min_desc_width, "Description".len(), DESCRIPTION_COL_WIDTH);
+        self.add_text_column("Description", false, DESCRIPTION_COL_WIDTH, |i| {
+            entries.get(*i).and_then(|mc| mc.description.clone())
+        });
+        money_index
     }
 }

@@ -3,17 +3,21 @@ Usage:
 
 Commands:
     list                    Prints an overview of the current tracker.
+                            With the --month or --year flags given, prints individual
+                            entries of only the given month.
 
     convert <input-file> <output-file>
                             Converts a TSV file into the standard SLF json format.
 
-    add <list> <category> <amount>
-                            Adds an entry to <list>, which can be either 't' or 'total' to
-                            add to the list of total money, 'i' or 'income' to add an
-                            income or 'e' or 'expenses' to add an expense.
-                            If <category> doesn't exist, a new category will be created.
-                            The entry will be inserted into the current month / year.
-                            <amount> should be an integer, which is interpreted as euros.
+    add <category> <amount>
+                            Adds an entry to the specified list (see --total, --incomes
+                            and --expenses). If <category> doesn't exist, a new category
+                            will be created. If no date or month / year is specified, the
+                            entry will be inserted into the current month / year. <amount>
+                            can be literal (with '.' as the decimal point) or a formula
+                            consisting of literals , addition, subtraction, right
+                            multiplication and division by integers as well as
+                            parentheses.
 
 Options:
     -h, --help              Prints this help message and exists.
@@ -25,7 +29,16 @@ Options:
                             Accepted by 'list' and 'add'.
 
     -c, --show-categories   Shows each category in a separate column.
-                            Accepted by 'add'.
+                            Accepted by 'list'.
+
+    -t, --total             Adds to the / shows the 'total' list.
+                            Accepted by 'list' and 'add'.
+
+    -i, --incomes           Adds to the / shows the 'incomes' list.
+                            Accepted by 'list' and 'add'.
+
+    -i, --expenses          Adds to the / shows the 'expenses' list.
+                            Accepted by 'list' and 'add'.
 
     -d, --description <description>
                             Adds a description when adding an entry.
@@ -33,7 +46,7 @@ Options:
 
     -D, --date <date>       Specifies a date when adding an entry. <date> must be in the
                             format "yyyy-mm-dd". Without this option, the current date
-                            will be used. Use '--date ""' to insert an entry without a
+                            will be used. Use --date "" to insert an entry without a
                             date. The date must be between Jan 1, 262145 BCE and Dec 31,
                             262143 CE, inclusive.
                             Accepted by 'add'.
@@ -43,14 +56,17 @@ Options:
                             number from 1 to 12 or the start of a month name, e.g. 'jan'
                             or 'January'. The match is case-insensitive. The given month
                             will be combined with the current year.
-                            Accepted by 'add'.
+                            Accepted by 'list' and 'add'.
 
     -y, --year <year>       Specifies a year when adding an entry. This argument cannot be
                             used in combination with --date. <year> can be any integer
-                            between -2147483648 and +2147483647 inclusive. The given year
-                            will be combined with the current month.
-                            Accepted by 'add'.
+                            between -2147483648 and +2147483647 inclusive. Inputs between
+                            0 and 99 inclusive will be adjusted to the current / last
+                            century (i.e. --year 26 will be interpreted as 2026). To avoid
+                            this conversion, prefix the year with a zero: --year 026. The
+                            given year will be combined with the current month.
+                            Accepted by 'list' and 'add'.
 
     -my, --month-year <month> <year>
                             Combination of --month and --year.
-                            Accepted by 'add'.
+                            Accepted by 'list' and 'add'.

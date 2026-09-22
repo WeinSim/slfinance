@@ -15,13 +15,13 @@ pub fn print_num_lines() {
     let src = match root.find(|e| e.as_ref().is_ok_and(|e| e.file_name() == "src")) {
         Some(Ok(s)) => s,
         _ => {
-            println!("Unable to find directory 'src'");
+            println!("unable to find directory 'src'");
             return;
         }
     };
     match get_num_lines(&src.path()) {
         Ok(sum) => {
-            println!("Number of lines: {sum}");
+            println!("number of lines: {sum}");
         }
         Err(e) => {
             println!("{e}");
@@ -68,8 +68,7 @@ pub fn split_into_lines<'a>(text: &'a str, line_width: usize) -> Vec<&'a str> {
     let mut lines: Vec<&'a str> = Vec::new();
     let mut last_space = StrPos { char: 0, byte: 0 };
     let mut line_start = StrPos { char: 0, byte: 0 };
-    let mut char: usize = 0;
-    for (byte, c) in text.char_indices() {
+    for (char, (byte, c)) in text.char_indices().enumerate() {
         if c == ' ' {
             last_space = StrPos { char, byte };
         }
@@ -87,7 +86,6 @@ pub fn split_into_lines<'a>(text: &'a str, line_width: usize) -> Vec<&'a str> {
                 line_start = StrPos { char, byte };
             }
         }
-        char += 1;
     }
     lines.push(&text[line_start.byte..]);
     lines

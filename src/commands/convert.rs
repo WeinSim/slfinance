@@ -52,7 +52,7 @@ fn add_list(
     i: &mut usize,
     num: usize,
     list: &mut MoneyList,
-    tsv: &Vec<Vec<&str>>,
+    tsv: &[Vec<&str>],
     split_terms: bool,
 ) -> Result<(), String> {
     let i_initial = *i;
@@ -89,12 +89,12 @@ fn add_list(
         for j in 0..num {
             let cell = row[*i];
             *i += 1;
-            let expression = if cell.starts_with('=') {
-                cell[1..].parse()?
+            let expression = if let Some(stripped) = cell.strip_prefix('=') {
+                stripped.parse()?
             } else {
                 Expression::Value(Money {
                     cents: cell
-                        .replace(&[',', '.', ' ', '€'], "")
+                        .replace([',', '.', ' ', '€'], "")
                         .parse::<i64>()
                         .map_err(|e| e.to_string())?,
                 })

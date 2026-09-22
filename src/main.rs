@@ -6,7 +6,6 @@ use std::{
 };
 
 use chrono::Month;
-use dirs;
 
 mod commands;
 mod expressions;
@@ -43,11 +42,7 @@ fn main() -> ExitCode {
         sutil::print_num_lines();
     }
     let args = &std::env::args().collect::<Vec<String>>()[1..];
-    // for arg in args {
-    //     println!("{}", arg);
-    // }
     match run(args) {
-        // match convert(args) {
         Ok(()) => ExitCode::SUCCESS,
         Err(msg) => {
             println!("{}", msg);
@@ -57,6 +52,11 @@ fn main() -> ExitCode {
 }
 
 fn run(args_raw: &[String]) -> Result<(), String> {
+    // let args = Arguments {
+    //     command: Some(List),
+    //     month: Some(September),
+    //     ..Default::default()
+    // };
     let args = Arguments::parse(args_raw)?;
     // process arguments
     let mut run_command = true;

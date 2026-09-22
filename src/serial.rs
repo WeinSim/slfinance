@@ -9,9 +9,9 @@ use crate::{
 
 pub fn load_file(filename: &str) -> Result<Tracker, String> {
     let json =
-        fs::read_to_string(filename).map_err(|e| format!("Unable to open file {filename}: {e}"))?;
+        fs::read_to_string(filename).map_err(|e| format!("unable to open file {filename}: {e}"))?;
     serde_json::from_str::<SerialTracker>(&json)
-        .map_err(|e| format!("Unable to parse file {filename}: {e}"))?
+        .map_err(|e| format!("unable to parse file {filename}: {e}"))?
         .as_tracker()
 }
 
@@ -49,7 +49,7 @@ struct Entry {
 }
 
 impl SerialTracker {
-    fn as_tracker(self) -> Result<Tracker, String> {
+    fn as_tracker(&self) -> Result<Tracker, String> {
         let mut tracker = Tracker::new();
         Self::add_tracker_entries(&mut tracker.total, &self.total_categories, &self.total)?;
         Self::add_tracker_entries(&mut tracker.incomes, &self.income_categories, &self.incomes)?;
@@ -116,7 +116,7 @@ impl SerialTracker {
         money_list: &MoneyList,
         categories: &mut Vec<String>,
     ) {
-        let mut entries = money_list.entries().into_iter().collect::<Vec<_>>();
+        let mut entries = money_list.entries().iter().collect::<Vec<_>>();
         entries.sort_by(|e1, e2| e1.0.cmp(e2.0));
         for (ym, entries) in entries {
             serial_list.push(YearMonthEntry {

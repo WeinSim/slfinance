@@ -31,7 +31,7 @@ impl Term {
 impl Expression {
     pub fn eval(&self) -> Money {
         match self {
-            Self::Value(m) => m.clone(),
+            Self::Value(m) => *m,
             Self::Sum(v) => v.iter().map(Term::eval).sum(),
             Self::Multiplication(e, f) => e.eval().mult(*f),
             Self::Division(e, d) => e.eval().div(*d),
@@ -44,7 +44,7 @@ impl FromStr for Expression {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut iter = CharIter::new(s.chars().filter(|c| !c.is_whitespace()).collect());
         if !iter.has_next() {
-            return Err("Cannot parse an empty string".to_owned());
+            return Err("cannot parse an empty string".to_owned());
         }
         parse_expression(&mut iter)
     }
@@ -86,7 +86,7 @@ fn parse_expression(iter: &mut CharIter) -> Result<Expression, String> {
                     expression: parse_term(iter)?,
                     sign: Sign::Positive,
                 });
-            } // c => return Err(format!("Unexpected character: {c}")),
+            } // c => return Err(format!("unexpected character: {c}")),
         }
     }
     Ok(Expression::Sum(terms))
@@ -99,7 +99,7 @@ fn parse_term(iter: &mut CharIter) -> Result<Expression, String> {
             Ok(parse_expression(iter)?)
         }
         Some(_) => Ok(Expression::Value(parse_money(iter)?)),
-        None => Err("Unexpected end of string".to_owned()),
+        None => Err("unexpected end of string".to_owned()),
     }
 }
 
@@ -142,7 +142,7 @@ fn parse_money(iter: &mut CharIter) -> Result<Money, String> {
     match state {
         State::Euros(e) => Ok(Money { cents: e * 100 }),
         State::Cents10(c) => Ok(Money { cents: c }),
-        _ => Err("Unexpected end of string".to_owned()),
+        _ => Err("unexpected end of string".to_owned()),
     }
 }
 
@@ -170,10 +170,10 @@ fn parse_int(iter: &mut CharIter) -> Result<i64, String> {
             },
         };
     }
-    return match state {
+    match state {
         State::Int(i) => Ok(i),
-        _ => Err("Unexpected end of string".to_owned()),
-    };
+        _ => Err("unexpected end of string".to_owned()),
+    }
 }
 
 struct CharIter {
@@ -209,7 +209,7 @@ impl CharIter {
 fn to_digit(c: char) -> Result<i64, String> {
     match c {
         '0'..='9' => Ok(c as i64 - '0' as i64),
-        _ => Err(format!("Invalid digit: {c}")),
+        _ => Err(format!("invalid digit: {c}")),
     }
 }
 

@@ -67,27 +67,27 @@ impl MoneyList {
 
     pub fn add_entry(&mut self, year_month: YearMonth, entry: MoneyChange) -> Result<(), String> {
         if !self.allow_negatives && entry.amount.eval().is_negative() {
-            return Err("A 'total' value cannot be negative".to_owned());
+            return Err("a 'total' value cannot be negative".to_owned());
         }
         if !self.allow_dates && entry.date.is_some() {
-            return Err("A 'total' entry cannot have a date associated with it".to_owned());
+            return Err("a 'total' entry cannot have a date associated with it".to_owned());
         }
         if let Some(date) = entry.date {
             if date.month() != year_month.month.number_from_month() {
                 return Err(
-                    "Given YearMonth does not match the month specified by 'entry'".to_owned(),
+                    "given YearMonth does not match the month specified by 'entry'".to_owned(),
                 );
             }
             if date.year() != year_month.year {
                 return Err(
-                    "Given YearMonth does not match the year specified by 'entry'".to_owned(),
+                    "given YearMonth does not match the year specified by 'entry'".to_owned(),
                 );
             }
         }
         match entry.category_id {
             Some(i) if i >= self.categories.len() => {
                 return Err(format!(
-                    "Index out of range (index={}, len={}",
+                    "index out of range (index={}, len={}",
                     i,
                     self.categories.len(),
                 ));
@@ -141,6 +141,10 @@ impl MoneyList {
 
     pub fn entries(&self) -> &HashMap<YearMonth, Vec<MoneyChange>> {
         &self.entries
+    }
+
+    pub fn allow_dates(&self) -> bool {
+        self.allow_dates
     }
 
     pub fn get_year_months(&self) -> Vec<YearMonth> {
@@ -220,6 +224,31 @@ impl PartialOrd for YearMonth {
     }
 }
 
+impl Display for YearMonth {
+    // The following format arguments are considered:
+    // width (total width), precision (number of characters used for the month),
+    // alignment and fill
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let month_name = self.month.name();
+        let month_len = match f.precision() {
+            Some(p) if p <= month_name.len() => p,
+            _ => month_name.len(),
+        };
+        let mut base_str = String::with_capacity(month_len + 4);
+        base_str.push_str(&month_name[..month_len]);
+        base_str.push(' ');
+        base_str.push_str(&self.year.to_string());
+        let pad = match f.width() {
+            Some(w) => w.saturating_sub(base_str.len()),
+            _ => 0,
+        };
+        if pad > 0 {
+            write!(f, "{:pad$}", "")?;
+        }
+        write!(f, "{}", base_str)
+    }
+}
+
 pub struct MoneyChange {
     pub amount: Expression,
     pub date: Option<NaiveDate>,
@@ -227,13 +256,7 @@ pub struct MoneyChange {
     pub description: Option<String>,
 }
 
-// impl MoneyChange {
-//     pub fn category<'a>(&self, list: &'a MoneyList) -> Option<&'a Category> {
-//         Some(&list.categories()[self.category_id?])
-//     }
-// }
-
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Money {
     pub cents: i64,
 }
@@ -257,12 +280,6 @@ impl Money {
         Self {
             cents: self.cents / dividend,
         }
-    }
-}
-
-impl Default for Money {
-    fn default() -> Self {
-        Self { cents: 0 }
     }
 }
 
