@@ -1,21 +1,18 @@
 # SLFinance
 
 ### Continue
-- slf add
-    - How to specify categories?
-        - Should categories be mandatory?
-        - Specify by index / identifier, which is separate from the display name?
+- slf delete
 
 ### Features to add
 - slf convert
     - Option to convert back from .json to .tsv (or .csv) to import data back in excel
-- Delete entries
 - Check that given aruments actually match the command
 - Export graphs
     - Which file format? (pdf, png, svg, html, ascii art)
 - Encrypted save files?
 
 ### Problems to fix
+- Sort MoneyChanges by date (in the data structure itself)
 - SerialTracker is 99% identical to Tracker. I think the only difference is that YearMonth
 is flattened.
 

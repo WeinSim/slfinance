@@ -69,7 +69,7 @@ impl SerialTracker {
         for cat in categories {
             list.add_category(Category {
                 name: cat.to_owned(),
-            });
+            })?;
         }
         for ym_entry in ym_entries {
             let ym = YearMonth {

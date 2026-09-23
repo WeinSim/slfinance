@@ -59,7 +59,7 @@ fn add_list(
     for _ in 0..num {
         list.add_category(Category {
             name: tsv[0][*i].to_owned(),
-        });
+        })?;
         *i += 1;
     }
     for row in &tsv[1..] {

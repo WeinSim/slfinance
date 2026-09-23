@@ -13,6 +13,7 @@ const MONEY_COL_WIDTH: usize = 13;
 const DATE_COL_WIDTH: usize = 10;
 const CATEGORY_COL_WIDTH: usize = 30;
 const DESCRIPTION_COL_WIDTH: usize = 30;
+const TABLE_PADDING: usize = 2;
 
 pub fn list(args: &Arguments, tracker: &Tracker) {
     match args.get_year_month() {
@@ -34,46 +35,36 @@ fn list_all(args: &Arguments, tracker: &Tracker) {
         tracker.get_year_months()
     };
     let mut table = Table::new(RowKey::from_year_months(&year_months));
+    // can fit at most -999,999.99€
+    table.key_width = 8;
+    table.key_prec = 3;
     if args.total {
         table.add_money_list(&tracker.total, "Total", show_categories, true);
+        table.add_money_column("Change", true, |ym| tracker.get_total_change(ym), true);
     }
-    table.add_money_column("Change", true, |ym| tracker.get_total_change(ym), true);
-    table.add_money_column("Diff", true, |ym| tracker.get_diff_total_change(ym), true);
-    table.add_money_column(
-        "Expected",
-        true,
-        |ym| tracker.get_expected_total_change(ym),
-        true,
-    );
+    if args.incomes && args.expenses {
+        if args.total {
+            table.add_money_column("Diff", true, |ym| tracker.get_diff_total_change(ym), true);
+        }
+        table.add_money_column(
+            "Expected",
+            true,
+            |ym| tracker.get_expected_total_change(ym),
+            true,
+        );
+    }
     if args.incomes {
         table.add_money_list(&tracker.incomes, "Incomes", show_categories, false);
     }
     if args.expenses {
         table.add_money_list(&tracker.expenses, "Expenses", show_categories, false);
     }
-    let ym_width: usize = 8;
-    let month_prec: usize = 3;
-    // can fit at most -999,999.99€
-    let pad: usize = 2;
-    table.print(ym_width, month_prec, pad);
+    table.print();
 }
 
 fn list_ym(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
     // prepare money lists
-    let initial_lists = [
-        (args.total, &tracker.total, "Total"),
-        (args.incomes, &tracker.incomes, "Incomes"),
-        (args.expenses, &tracker.expenses, "Expenses"),
-    ];
-    let initial_lists: Vec<_> = if initial_lists.iter().any(|(a, _, _)| *a) {
-        initial_lists
-            .iter()
-            .filter_map(|(a, l, n)| if *a { Some((*l, *n)) } else { None })
-            .collect()
-    } else {
-        initial_lists.iter().map(|(_, l, n)| (*l, *n)).collect()
-    };
-    let lists: Vec<(&MoneyList, &Vec<MoneyChange>, &str)> = initial_lists
+    let lists: Vec<(&MoneyList, &Vec<MoneyChange>, &str)> = get_specified_lists(args, tracker)
         .iter()
         .map(|(l, n)| (l, l.entries().get(&year_month), n))
         .filter_map(|(l, o, n)| o.as_ref().map(|v| (*l, *v, *n)))
@@ -86,6 +77,8 @@ fn list_ym(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
             .max()
             .unwrap_or_default(),
     );
+    table.key_width = 3;
+    table.key_prec = 3;
     let mut money_indices = Vec::<usize>::new();
     for (list, vec, name) in &lists {
         money_indices.push(table.add_money_list(list, vec, name));
@@ -93,8 +86,7 @@ fn list_ym(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
     // print year and month
     println!("{} {}", year_month.month.name(), year_month.year);
     // print table
-    let pad: usize = 2;
-    table.print(0, 0, pad);
+    table.print();
     if table.is_empty() {
         return;
     }
@@ -116,8 +108,39 @@ fn list_ym(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
             color: false,
         };
     }
-    table.print_row(&row1, pad);
-    table.print_row(&row2, pad);
+    table.print_row(&row1, None);
+    table.print_row(&row2, None);
+}
+
+pub fn list_categories(args: &Arguments, tracker: &Tracker) -> Result<(), String> {
+    let lists = get_specified_lists(args, tracker);
+    let max_num_categories = lists
+        .iter()
+        .map(|(l, _)| l.categories().len())
+        .max()
+        .unwrap();
+    let mut table = Table::with_num_rows(max_num_categories);
+    for (list, name) in lists {
+        table.add_text_column(name, true, CATEGORY_COL_WIDTH, |i| {
+            list.categories().get(*i).map(|c| "  ".to_owned() + &c.name)
+        });
+    }
+    table.print();
+    Ok(())
+}
+
+fn get_specified_lists<'a>(
+    args: &Arguments,
+    tracker: &'a Tracker,
+) -> Vec<(&'a MoneyList, &'static str)> {
+    [
+        (args.total, &tracker.total, "Total"),
+        (args.incomes, &tracker.incomes, "Incomes"),
+        (args.expenses, &tracker.expenses, "Expenses"),
+    ]
+    .iter()
+    .filter_map(|(a, l, n)| if *a { Some((*l, *n)) } else { None })
+    .collect::<Vec<_>>()
 }
 
 struct Table<'a, K>
@@ -127,6 +150,9 @@ where
     columns: Vec<Column<'a>>,
     cells: HashMap<K, Vec<Cell>>,
     row_keys: Vec<RowKey<K>>,
+    key_width: usize,
+    key_prec: usize,
+    pad: usize,
 }
 
 struct Column<'a> {
@@ -267,6 +293,9 @@ where
             columns: Vec::new(),
             cells: HashMap::new(),
             row_keys,
+            key_width: 0,
+            key_prec: 0,
+            pad: TABLE_PADDING,
         }
     }
 
@@ -309,7 +338,7 @@ where
         self.columns.is_empty() || self.row_keys.is_empty()
     }
 
-    fn print(&mut self, key_width: usize, key_prec: usize, pad: usize) {
+    fn print(&mut self) {
         if self.is_empty() {
             println!("[empty]");
             return;
@@ -323,6 +352,8 @@ where
             .max()
             .unwrap();
         for i in 0..num_header_rows {
+            let key_width = self.key_width;
+            let pad = self.pad;
             if key_width > 0 {
                 print!("{:key_width$}{:pad$}", "", "");
             }
@@ -344,23 +375,32 @@ where
         for key in &self.row_keys {
             match key {
                 RowKey::Key(key) => {
-                    if key_width > 0 {
-                        print!("{:key_prec$.key_prec$}{:pad$}", key, "");
-                    }
                     let Some(row) = self.cells.get(key) else {
                         // this should never happen as values are always inserted for
                         // every row key
                         println!("[no row for key {}]", key);
                         continue;
                     };
-                    self.print_row(row, pad);
+                    self.print_row(row, Some(key));
                 }
                 RowKey::Dots => println!("..."),
             }
         }
     }
 
-    fn print_row(&self, row: &[Cell], pad: usize) {
+    fn print_row(&self, row: &[Cell], key: Option<&K>) {
+        let key_width = self.key_width;
+        let key_prec = self.key_prec;
+        let pad = self.pad;
+        if key_width > 0 {
+            if key_prec > 0
+                && let Some(key) = key
+            {
+                print!("{:key_width$.key_prec$}{:pad$}", key, "");
+            } else {
+                print!("{:key_width$}{:pad$}", "", "");
+            }
+        }
         for (j, cell) in row.iter().enumerate() {
             cell.print(self.columns[j].width);
             if j < row.len() - 1 {

@@ -1,4 +1,5 @@
 mod add;
+mod add_remove_categories;
 mod convert;
 mod list;
 
@@ -6,7 +7,12 @@ use chrono::{Datelike, Local, Month, NaiveDate};
 
 use crate::{
     CONFIG, MONTHS, SETTINGS, SETTINGS_PATH,
-    commands::{add::add, convert::convert, list::list},
+    commands::{
+        add::add,
+        add_remove_categories::{add_category, remove_category},
+        convert::convert,
+        list::{list, list_categories},
+    },
     expressions::Expression,
     money::{Tracker, YearMonth},
     serial::{self, save_file},
@@ -92,6 +98,7 @@ pub struct Arguments {
     pub help: Option<bool>,
     pub file: Option<String>,
     pub show_categories: Option<bool>,
+    pub category: Option<String>,
     pub total: bool,
     pub incomes: bool,
     pub expenses: bool,
@@ -103,14 +110,20 @@ pub struct Arguments {
 
 impl Arguments {
     pub fn get_year_month(&self) -> Option<YearMonth> {
-        match self.month {
-            Some(month) => Some(YearMonth {
-                month,
-                year: self
-                    .year
-                    .unwrap_or_else(|| Local::now().date_naive().year()),
-            }),
-            None => None,
+        self.month.map(|month| YearMonth {
+            month,
+            year: self
+                .year
+                .unwrap_or_else(|| Local::now().date_naive().year()),
+        })
+    }
+
+    pub fn get_list_type(&self) -> Result<MoneyListType, String> {
+        match (&self.total, &self.incomes, &self.expenses) {
+            (true, false, false) => Ok(MoneyListType::Total),
+            (false, true, false) => Ok(MoneyListType::Incomes),
+            (false, false, true) => Ok(MoneyListType::Expenses),
+            _ => Err("must specify exactly one of --total, --incomes or --expenses".to_owned()),
         }
     }
 
@@ -135,8 +148,11 @@ impl Arguments {
                 Arg::Short('f') | Arg::Long("file") => {
                     Self::set_arg(&mut args.file, &mut iter, Self::parse_str, "file")?
                 }
-                Arg::Short('c') | Arg::Long("show-categories") => {
+                Arg::Short('s') | Arg::Long("show-categories") => {
                     Self::set(&mut args.show_categories, true, "show-categories")?
+                }
+                Arg::Short('c') | Arg::Long("category") => {
+                    Self::set_arg(&mut args.category, &mut iter, Self::parse_str, "category")?
                 }
                 // no duplicate checks for these three
                 Arg::Short('t') | Arg::Long("total") => args.total = true,
@@ -169,6 +185,8 @@ impl Arguments {
                 Arg::None => break,
             }
         }
+        // if neither of --total, --incomes and --expenses were given, all three are set
+        // to true
         if !(args.total || args.incomes || args.expenses) {
             args.total = true;
             args.incomes = true;
@@ -264,8 +282,11 @@ impl Arguments {
 
 pub(crate) enum Command {
     List,
-    Add(String, Expression),
+    Add(Expression),
     Convert(String, String),
+    ListCategories,
+    AddCategory(String),
+    RemoveCategory(String),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -287,14 +308,22 @@ impl Parse for Command {
             match command {
                 "list" => Ok(Self::List),
                 "add" => {
-                    let cat_name = iter.next().ok_or("Expected category name")?.to_owned();
-                    let formula = iter.next().ok_or("Expected formula")?.parse()?;
-                    Ok(Self::Add(cat_name, formula))
+                    let formula = iter.next().ok_or("expected formula")?.parse()?;
+                    Ok(Self::Add(formula))
                 }
                 "convert" => {
-                    let input_file = iter.next().ok_or("Expected input file")?.to_owned();
-                    let output_file = iter.next().ok_or("Expected output file")?.to_owned();
+                    let input_file = iter.next().ok_or("expected input file")?.to_owned();
+                    let output_file = iter.next().ok_or("expected output file")?.to_owned();
                     Ok(Self::Convert(input_file, output_file))
+                }
+                "list-categories" => Ok(Self::ListCategories),
+                "add-category" => {
+                    let category = iter.next().ok_or("expected category name")?.to_owned();
+                    Ok(Self::AddCategory(category))
+                }
+                "remove-category" => {
+                    let category = iter.next().ok_or("expected category name")?.to_owned();
+                    Ok(Self::RemoveCategory(category))
                 }
                 _ => Err(format!("invalid command: '{command}'")),
             }
@@ -308,27 +337,23 @@ impl Command {
     pub fn run(&self, args: &Arguments) -> Result<(), String> {
         match self {
             Self::List => list(args, &load_tracker(args)?),
-            Self::Add(cat_name, expression) => {
-                let list_type = match (&args.total, &args.incomes, &args.expenses) {
-                    (true, false, false) => MoneyListType::Total,
-                    (false, true, false) => MoneyListType::Incomes,
-                    (false, false, true) => MoneyListType::Expenses,
-                    _ => {
-                        return Err(
-                            "must specify exactly one of --total, --incomes or --expenses"
-                                .to_owned(),
-                        );
-                    }
-                };
+            Self::Add(expression) => {
                 add(
                     args,
                     &mut load_tracker(args)?,
-                    list_type,
-                    cat_name,
+                    args.get_list_type()?,
+                    args.category.as_deref(),
                     expression,
                 )?;
             }
             Self::Convert(input_file, output_file) => convert(input_file, output_file)?,
+            Self::ListCategories => list_categories(args, &load_tracker(args)?)?,
+            Self::AddCategory(name) => {
+                add_category(&mut load_tracker(args)?, name, args.get_list_type()?)?
+            }
+            Self::RemoveCategory(name) => {
+                remove_category(&mut load_tracker(args)?, name, args.get_list_type()?)?
+            }
         }
         // save settings file
         if let Some(ref path) = *SETTINGS_PATH {

@@ -10,15 +10,14 @@ pub fn add(
     args: &Arguments,
     tracker: &mut Tracker,
     list_type: MoneyListType,
-    cat_name: &str,
+    category: Option<&str>,
     expression: &Expression,
 ) -> Result<(), String> {
-    let list = match list_type {
-        MoneyListType::Total => &mut tracker.total,
-        MoneyListType::Incomes => &mut tracker.incomes,
-        MoneyListType::Expenses => &mut tracker.expenses,
+    let list = tracker.get_mut_money_list(list_type);
+    let cat_id = match category {
+        Some(prefix) => Some(list.find_category_by_prefix(prefix)?),
+        None => None,
     };
-    let cat_id = list.find_or_create_category(cat_name);
     let given_ym = args.get_year_month();
     let today = Local::now().date_naive();
     let date = args.date.unwrap_or(match given_ym {
@@ -31,7 +30,7 @@ pub fn add(
         MoneyChange {
             amount: expression.clone(),
             date,
-            category_id: Some(cat_id),
+            category_id: cat_id,
             description: args.description.clone(),
         },
     )?;

@@ -6,9 +6,6 @@ Commands:
                             With the --month or --year flags given, prints individual
                             entries of only the given month.
 
-    convert <input-file> <output-file>
-                            Converts a TSV file into the standard SLF json format.
-
     add <category> <amount>
                             Adds an entry to the specified list (see --total, --incomes
                             and --expenses). If <category> doesn't exist, a new category
@@ -19,6 +16,22 @@ Commands:
                             multiplication and division by integers as well as
                             parentheses.
 
+    convert <input-file> <output-file>
+                            Converts a TSV file into the standard SLF json format.
+
+    list-categories         Lists all categories of the specified list (see --total,
+                            --incomes and --expenses).
+
+    add-category <category>
+                            Adds a category named <category> to the specified list (see
+                            --total, --incomes and --expenses).
+
+    remove-category <category>
+                            Removes the specified category from the specified list (see
+                            --total, --incomes and --expenses). <catgory> must be a unique
+                            prefix of the given list's catgories. In particular, it can be
+                            the name of the category.
+
 Options:
     -h, --help              Prints this help message and exists.
 
@@ -26,19 +39,27 @@ Options:
 
     -f, --file <file>       Opens the specified file. If this option is not specified, the
                             file stored in ~/.slfinance/settings.json is loaded.
-                            Accepted by 'list' and 'add'.
-
-    -c, --show-categories   Shows each category in a separate column.
-                            Accepted by 'list'.
+                            Accepted by 'list', 'add', 'list-categories', 'add-category'
+                            and 'remove-category'.
 
     -t, --total             Adds to the / shows the 'total' list.
-                            Accepted by 'list' and 'add'.
+                            Accepted by 'list', 'add', 'list-categories', 'add-category'
+                            and 'remove-category'.
 
     -i, --incomes           Adds to the / shows the 'incomes' list.
-                            Accepted by 'list' and 'add'.
+                            Accepted by 'list', 'add', 'list-categories', 'add-category'
+                            and 'remove-category'.
 
     -e, --expenses          Adds to the / shows the 'expenses' list.
-                            Accepted by 'list' and 'add'.
+                            Accepted by 'list', 'add', 'list-categories', 'add-category'
+                            and 'remove-category'.
+
+    -s, --show-categories   Shows each category in a separate column.
+                            Accepted by 'list'.
+
+    -c, --category <category>
+                            Specifies a category in which to add a new entry.
+                            Accepted by 'add'.
 
     -d, --description <description>
                             Adds a description when adding an entry.

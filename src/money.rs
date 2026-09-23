@@ -8,7 +8,7 @@ use std::{
 
 use chrono::{Datelike, Month, NaiveDate};
 
-use crate::expressions::Expression;
+use crate::{commands::MoneyListType, expressions::Expression};
 
 pub struct Tracker {
     pub total: MoneyList,
@@ -22,6 +22,14 @@ impl Tracker {
             total: MoneyList::new(false, false),
             incomes: MoneyList::new(true, true),
             expenses: MoneyList::new(true, true),
+        }
+    }
+
+    pub fn get_mut_money_list(&mut self, list_type: MoneyListType) -> &mut MoneyList {
+        match list_type {
+            MoneyListType::Total => &mut self.total,
+            MoneyListType::Incomes => &mut self.incomes,
+            MoneyListType::Expenses => &mut self.expenses,
         }
     }
 
@@ -118,20 +126,63 @@ impl MoneyList {
         self.categories.iter().position(|c| c.name == name)
     }
 
-    pub fn find_or_create_category(&mut self, name: &str) -> usize {
-        match self.find_category(name) {
-            Some(i) => i,
-            None => {
-                self.add_category(Category {
-                    name: name.to_owned(),
-                });
-                self.categories.len() - 1
+    pub fn find_category_by_prefix(&self, prefix: &str) -> Result<usize, String> {
+        let prefix_lower = prefix.to_lowercase();
+        let matches = self
+            .categories
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.name.to_lowercase().starts_with(&prefix_lower))
+            .collect::<Vec<_>>();
+        match matches.len() {
+            1 => Ok(matches[0].0),
+            0 => Err(format!("prefix '{prefix}' matches no categories")),
+            _ => {
+                let mut msg = String::new();
+                msg.push_str("prefix '");
+                msg.push_str(prefix);
+                msg.push_str("' matches multiple categories: \n");
+                for (_, c) in matches {
+                    msg.push_str(&c.name);
+                    msg.push('\n');
+                }
+                msg.remove(msg.len() - 1);
+                Err(msg)
             }
         }
     }
 
-    pub fn add_category(&mut self, category: Category) {
+    // pub fn find_or_create_category(&mut self, name: &str) -> usize {
+    //     match self.find_category(name) {
+    //         Some(i) => i,
+    //         None => {
+    //             self.add_category(Category {
+    //                 name: name.to_owned(),
+    //             });
+    //             self.categories.len() - 1
+    //         }
+    //     }
+    // }
+
+    pub fn add_category(&mut self, category: Category) -> Result<(), String> {
+        if self.find_category(&category.name).is_some() {
+            return Err(format!("category named '{}' already exists", category.name));
+        }
         self.categories.push(category);
+        Ok(())
+    }
+
+    pub fn remove_category(&mut self, cat_id: usize) {
+        self.categories.remove(cat_id);
+        for (_, vec) in &mut self.entries {
+            for mc in vec.iter_mut() {
+                match mc.category_id {
+                    Some(i) if i == cat_id => mc.category_id = None,
+                    Some(i) if i > cat_id => mc.category_id = Some(i - 1),
+                    _ => {}
+                }
+            }
+        }
     }
 
     pub fn categories(&self) -> &Vec<Category> {
