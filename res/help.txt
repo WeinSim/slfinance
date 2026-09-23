@@ -37,7 +37,7 @@ Options:
     -i, --incomes           Adds to the / shows the 'incomes' list.
                             Accepted by 'list' and 'add'.
 
-    -i, --expenses          Adds to the / shows the 'expenses' list.
+    -e, --expenses          Adds to the / shows the 'expenses' list.
                             Accepted by 'list' and 'add'.
 
     -d, --description <description>

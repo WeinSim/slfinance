@@ -15,11 +15,16 @@ use crate::{
 struct ArgsIter<'a> {
     args: &'a [String],
     index: usize,
+    short_iter: Option<(Vec<char>, usize)>,
 }
 
 impl<'a> ArgsIter<'a> {
     fn new(args: &'a [String]) -> Self {
-        Self { args, index: 0 }
+        Self {
+            args,
+            index: 0,
+            short_iter: None,
+        }
     }
 
     fn next(&mut self) -> Option<&str> {
@@ -32,9 +37,52 @@ impl<'a> ArgsIter<'a> {
         }
     }
 
+    fn next_arg(&mut self) -> Arg<'a> {
+        match &mut self.short_iter {
+            Some((v, i)) => {
+                let ret = v[*i];
+                *i += 1;
+                if *i == v.len() {
+                    self.short_iter = None;
+                }
+                Arg::Short(ret)
+            }
+            None => {
+                let Some(arg) = self.args.get(self.index) else {
+                    return Arg::None;
+                };
+                self.index += 1;
+                if let Some(name) = arg.strip_prefix('-') {
+                    if let Some(long_name) = name.strip_prefix('-') {
+                        Arg::Long(long_name)
+                    } else {
+                        if name.is_empty() {
+                            return Arg::Invalid("");
+                        }
+                        let chars: Vec<char> = name.chars().collect();
+                        let ret = chars[0];
+                        if chars.len() > 1 {
+                            self.short_iter = Some((chars, 1));
+                        }
+                        Arg::Short(ret)
+                    }
+                } else {
+                    Arg::Invalid(arg)
+                }
+            }
+        }
+    }
+
     fn peek(&self) -> Option<&String> {
         self.args.get(self.index)
     }
+}
+
+enum Arg<'a> {
+    Short(char),
+    Long(&'a str),
+    Invalid(&'a str),
+    None,
 }
 
 #[derive(Default)]
@@ -71,6 +119,7 @@ impl Arguments {
     pub fn parse(args_raw: &[String]) -> Result<Self, String> {
         let mut iter = ArgsIter::new(args_raw);
         let mut args = Self::default();
+        // parse first argument as command
         if let Some(first) = iter.peek() {
             if !first.starts_with('-') {
                 args.command = Some(Command::parse(&mut iter)?);
@@ -78,21 +127,24 @@ impl Arguments {
         } else {
             return Err(CONFIG.help_message.clone());
         }
-        while let Some(arg) = iter.next() {
-            match arg {
-                "-v" | "--version" => Self::set(&mut args.version, true, "version")?,
-                "-h" | "--help" => Self::set(&mut args.help, true, "help")?,
-                "-f" | "--file" => {
+        // parse remaining arguments
+        loop {
+            match iter.next_arg() {
+                Arg::Short('v') | Arg::Long("version") => {
+                    Self::set(&mut args.version, true, "version")?
+                }
+                Arg::Short('h') | Arg::Long("help") => Self::set(&mut args.help, true, "help")?,
+                Arg::Short('f') | Arg::Long("file") => {
                     Self::set_arg(&mut args.file, &mut iter, Self::parse_str, "file")?
                 }
-                "-c" | "--show-categories" => {
+                Arg::Short('c') | Arg::Long("show-categories") => {
                     Self::set(&mut args.show_categories, true, "show-categories")?
                 }
                 // no duplicate checks for these three
-                "-t" | "--total" => args.total = true,
-                "-i" | "--incomes" => args.incomes = true,
-                "-e" | "--expenses" => args.expenses = true,
-                "-d" | "--description" => {
+                Arg::Short('t') | Arg::Long("total") => args.total = true,
+                Arg::Short('i') | Arg::Long("incomes") => args.incomes = true,
+                Arg::Short('e') | Arg::Long("expenses") => args.expenses = true,
+                Arg::Short('d') | Arg::Long("description") => {
                     Self::set_arg(
                         &mut args.description,
                         &mut iter,
@@ -100,20 +152,23 @@ impl Arguments {
                         "description",
                     )?;
                 }
-                "-D" | "--date" => {
+                Arg::Short('D') | Arg::Long("date") => {
                     Self::set_arg(&mut args.date, &mut iter, Self::parse_date, "date")?;
                 }
-                "-m" | "--month" => {
+                Arg::Short('m') | Arg::Long("month") => {
                     Self::set_arg(&mut args.month, &mut iter, Self::parse_month, "month")?;
                 }
-                "-y" | "--year" => {
+                Arg::Short('y') | Arg::Long("year") => {
                     Self::set_arg(&mut args.year, &mut iter, Self::parse_year, "year")?;
                 }
-                "-my" | "--month-year" => {
+                Arg::Long("month-year") => {
                     Self::set_arg(&mut args.month, &mut iter, Self::parse_month, "month")?;
                     Self::set_arg(&mut args.year, &mut iter, Self::parse_year, "year")?;
                 }
-                a => return Err(format!("unknown argument: '{a}'")),
+                Arg::Short(c) => return Err(format!("unknown argument: '-{c}'")),
+                Arg::Long(n) => return Err(format!("unknown argument: '--{n}'")),
+                Arg::Invalid(a) => return Err(format!("invalid argument: '{a}'")),
+                Arg::None => break,
             }
         }
         if !(args.total || args.incomes || args.expenses) {
