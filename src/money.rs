@@ -84,15 +84,14 @@ impl MoneyList {
                 );
             }
         }
-        match entry.category_id {
-            Some(i) if i >= self.categories.len() => {
-                return Err(format!(
-                    "index out of range (index={}, len={}",
-                    i,
-                    self.categories.len(),
-                ));
-            }
-            _ => {}
+        if let Some(i) = entry.category_id
+            && i >= self.categories.len()
+        {
+            return Err(format!(
+                "category index out of range (index={}, len={}",
+                i,
+                self.categories.len(),
+            ));
         }
         self.entries.entry(year_month).or_default().push(entry);
         Ok(())

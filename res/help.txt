@@ -67,6 +67,6 @@ Options:
                             given year will be combined with the current month.
                             Accepted by 'list' and 'add'.
 
-    -my, --month-year <month> <year>
+        --month-year <month> <year>
                             Combination of --month and --year.
                             Accepted by 'list' and 'add'.

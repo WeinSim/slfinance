@@ -23,7 +23,16 @@ pub fn list(args: &Arguments, tracker: &Tracker) {
 
 fn list_all(args: &Arguments, tracker: &Tracker) {
     let show_categories = args.show_categories.unwrap_or(false);
-    let year_months = tracker.get_year_months();
+    let year_months = if let Some(year) = args.year {
+        tracker
+            .get_year_months()
+            .iter()
+            .filter(|ym| ym.year == year)
+            .map(|ym| ym.to_owned())
+            .collect()
+    } else {
+        tracker.get_year_months()
+    };
     let mut table = Table::new(RowKey::from_year_months(&year_months));
     if args.total {
         table.add_money_list(&tracker.total, "Total", show_categories, true);

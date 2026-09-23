@@ -103,16 +103,14 @@ pub struct Arguments {
 
 impl Arguments {
     pub fn get_year_month(&self) -> Option<YearMonth> {
-        let today = Local::now().date_naive();
-        if self.month.is_none() && self.year.is_none() {
-            None
-        } else {
-            Some(YearMonth {
-                year: self.year.unwrap_or(today.year()),
-                month: self
-                    .month
-                    .unwrap_or(YearMonth::month_from_naive_date(today)),
-            })
+        match self.month {
+            Some(month) => Some(YearMonth {
+                month,
+                year: self
+                    .year
+                    .unwrap_or_else(|| Local::now().date_naive().year()),
+            }),
+            None => None,
         }
     }
 
