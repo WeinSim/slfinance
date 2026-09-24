@@ -330,8 +330,7 @@ impl PartialEq for MoneyChange {
     }
 }
 
-impl Eq for MoneyChange {
-}
+impl Eq for MoneyChange {}
 
 impl PartialOrd for MoneyChange {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -341,10 +340,16 @@ impl PartialOrd for MoneyChange {
 
 impl Ord for MoneyChange {
     fn cmp(&self, other: &Self) -> Ordering {
-        let default_date = NaiveDate::MIN;
-        self.date
-            .unwrap_or(default_date)
-            .cmp(&other.date.unwrap_or(default_date))
+        let default_cat = usize::MAX;
+        let default_date = NaiveDate::MAX;
+        self.category_id
+            .unwrap_or(default_cat)
+            .cmp(&other.category_id.unwrap_or(default_cat))
+            .then_with(|| {
+                self.date
+                    .unwrap_or(default_date)
+                    .cmp(&other.date.unwrap_or(default_date))
+            })
     }
 }
 

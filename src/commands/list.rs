@@ -11,13 +11,13 @@ use crate::{
 
 const MONEY_COL_WIDTH: usize = 13;
 const DATE_COL_WIDTH: usize = 10;
-const CATEGORY_COL_WIDTH: usize = 30;
+const CATEGORY_COL_WIDTH: usize = 25;
 const DESCRIPTION_COL_WIDTH: usize = 30;
 const TABLE_PADDING: usize = 2;
 
 pub fn list(args: &Arguments, tracker: &Tracker) {
     match args.get_year_month() {
-        Some(ym) => list_ym(args, tracker, ym),
+        Some(ym) => list_detailed(args, tracker, ym),
         None => list_all(args, tracker),
     }
 }
@@ -62,7 +62,7 @@ fn list_all(args: &Arguments, tracker: &Tracker) {
     table.print();
 }
 
-fn list_ym(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
+fn list_detailed(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
     // prepare money lists
     let lists: Vec<(&MoneyList, &Vec<MoneyChange>, &str)> = get_specified_lists(args, tracker)
         .iter()
@@ -81,7 +81,7 @@ fn list_ym(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
     table.key_prec = 3;
     let mut money_indices = Vec::<usize>::new();
     for (list, vec, name) in &lists {
-        money_indices.push(table.add_money_list(list, vec, name));
+        money_indices.push(table.add_money_list(list, vec, name, args.wide.is_some()));
     }
     // print year and month
     println!("{} {}", year_month.month.name(), year_month.year);
@@ -121,7 +121,8 @@ pub fn list_categories(args: &Arguments, tracker: &Tracker) -> Result<(), String
         .unwrap();
     let mut table = Table::with_num_rows(max_num_categories);
     for (list, name) in lists {
-        table.add_text_column(name, true, CATEGORY_COL_WIDTH, |i| {
+        let width = CATEGORY_COL_WIDTH * if args.wide.is_some() { 2 } else { 1 };
+        table.add_text_column(name, true, width, |i| {
             list.categories().get(*i).map(|c| "  ".to_owned() + &c.name)
         });
     }
@@ -449,8 +450,11 @@ impl<'a> Table<'a, usize> {
         money_list: &MoneyList,
         entries: &[MoneyChange],
         name: &'a str,
+        wide: bool,
     ) -> usize {
         let money_index = self.columns.len();
+        // we do not use add_money_column because if there is no money in a cell, we want an empty
+        // cell, not 0.00 €
         self.add_column(name, true, MONEY_COL_WIDTH, |i| {
             entries
                 .get(*i)
@@ -468,7 +472,8 @@ impl<'a> Table<'a, usize> {
                     .map(|d| d.to_string())
             });
         }
-        self.add_text_column("Category", false, CATEGORY_COL_WIDTH, |i| {
+        let width = CATEGORY_COL_WIDTH * if wide { 2 } else { 1 };
+        self.add_text_column("Category", false, width, |i| {
             entries
                 .get(*i)
                 .and_then(|mc| mc.category_id)
@@ -476,9 +481,14 @@ impl<'a> Table<'a, usize> {
         });
         // let min_desc_width = entries.iter().filter_map(|mc| mc.description.clone()).map(|d| d.len()).max().unwrap_or_default();
         // let col_width = usize::clamp(min_desc_width, "Description".len(), DESCRIPTION_COL_WIDTH);
-        self.add_text_column("Description", false, DESCRIPTION_COL_WIDTH, |i| {
-            entries.get(*i).and_then(|mc| mc.description.clone())
-        });
+        // only add a column for descriptions if any of the entries actually have a description
+        let add_desc_col = entries.iter().find(|mc| mc.description.is_some()).is_some();
+        if add_desc_col {
+            let width = DESCRIPTION_COL_WIDTH * if wide { 2 } else { 1 };
+            self.add_text_column("Description", false, width, |i| {
+                entries.get(*i).and_then(|mc| mc.description.clone())
+            });
+        }
         money_index
     }
 }

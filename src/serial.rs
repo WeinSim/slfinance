@@ -42,10 +42,10 @@ struct YearMonthEntry {
 #[derive(serde::Deserialize, serde::Serialize)]
 struct Entry {
     #[serde(with = "expr_serde")]
-    amount: Expression,
-    category: Option<usize>,
+    amt: Expression,
+    cat: Option<usize>,
     date: Option<NaiveDate>,
-    description: Option<String>,
+    desc: Option<String>,
 }
 
 impl SerialTracker {
@@ -80,10 +80,10 @@ impl SerialTracker {
                 list.add_entry(
                     ym,
                     MoneyChange {
-                        amount: entry.amount.clone(),
-                        category_id: entry.category,
+                        amount: entry.amt.clone(),
+                        category_id: entry.cat,
                         date: entry.date,
-                        description: entry.description.clone(),
+                        description: entry.desc.clone(),
                     },
                 )?;
             }
@@ -125,10 +125,10 @@ impl SerialTracker {
                 entries: entries
                     .iter()
                     .map(|mc| Entry {
-                        category: mc.category_id,
-                        amount: mc.amount.clone(),
+                        cat: mc.category_id,
+                        amt: mc.amount.clone(),
                         date: mc.date,
-                        description: mc.description.clone(),
+                        desc: mc.description.clone(),
                     })
                     .collect(),
             })

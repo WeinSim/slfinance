@@ -108,6 +108,7 @@ pub struct Arguments {
     pub date: Option<Option<NaiveDate>>,
     pub month: Option<Month>,
     pub year: Option<i32>,
+    pub wide: Option<bool>,
 }
 
 impl Arguments {
@@ -175,6 +176,7 @@ impl Arguments {
                 Arg::Short('y') | Arg::Long("year") => {
                     Self::set_arg(&mut args.year, &mut iter, Self::parse_year, "year")?;
                 }
+                Arg::Short('w') | Arg::Long("wide") => Self::set(&mut args.wide, true, "wide")?,
                 Arg::Short(c) => return Err(format!("unknown argument: '-{c}'")),
                 Arg::Long(n) => return Err(format!("unknown argument: '--{n}'")),
                 Arg::Invalid(a) => return Err(format!("invalid argument: '{a}'")),
@@ -234,11 +236,21 @@ impl Arguments {
     }
 
     fn parse_date(s: &str) -> Result<Option<NaiveDate>, String> {
-        if s.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(s.parse::<NaiveDate>().map_err(|e| e.to_string())?))
-        }
+        Ok(match s {
+            "" => None,
+            "." => Some(*TODAY),
+            _ => {
+                if let Ok(day) = s.parse::<u32>() {
+                    let ym = YearMonth::from_naive_date(*TODAY);
+                    Some(
+                        NaiveDate::from_ymd_opt(ym.year, ym.month.number_from_month(), day)
+                            .ok_or(format!("invalid day of current month: {day}"))?,
+                    )
+                } else {
+                    Some(s.parse::<NaiveDate>().map_err(|e| e.to_string())?)
+                }
+            }
+        })
     }
 
     fn parse_month(s: &str) -> Result<Month, String> {
@@ -326,7 +338,7 @@ impl Parse for Command {
                         .map_err(|e| e.to_string())?;
                     Ok(Self::Remove(index))
                 }
-                "c" | "convert" => {
+                "convert" => {
                     let input_file = iter.next().ok_or("expected input file")?.to_owned();
                     let output_file = iter.next().ok_or("expected output file")?.to_owned();
                     Ok(Self::Convert(input_file, output_file))
@@ -362,9 +374,9 @@ impl Command {
                 )?;
             }
             Self::Remove(index) => {
-                let Some(year_month) = args.get_year_month() else {
-                    return Err("missing --month argument".to_owned());
-                };
+                let year_month = args
+                    .get_year_month()
+                    .unwrap_or(YearMonth::from_naive_date(*TODAY));
                 remove(
                     &mut load_tracker(args)?,
                     args.get_list_type().unwrap_or(MoneyListType::Expenses),

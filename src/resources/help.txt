@@ -3,91 +3,84 @@ Usage:
 
 Commands:
     ls,  list               Prints an overview of the current tracker.
-                            With the --month flag, prints a detailed view of the specified
-                            month.
+                            With the --month flag, prints a detailed view of the
+                            specified month.
 
-    a,   add <AMOUNT>       Adds an entry to the specified list (default is expenses). If
-                            no date or month / year is specified, the entry will be
-                            inserted into the current month / year. <AMOUNT> can be
-                            literal (with '.' as the decimal point) or a formula
-                            consisting of literals , addition, subtraction, right
-                            multiplication and division by integers as well as
-                            parentheses.
+    a,   add <AMOUNT>       Adds an entry to the specified list (default is
+                            expenses). If no date or month / year is specified,
+                            the entry will be inserted into the current month /
+                            year. <AMOUNT> can be literal (with '.' as the
+                            decimal point) or a formula consisting of literals ,
+                            addition, subtraction, right multiplication and
+                            division by integers as well as parentheses.
 
-    rm,  remove <INDEX>     Removes an entry from the specified month of the specified
-                            list (default is expenses). <INDEX> is the index of the entry
-                            as displayed in the left column of the detailed list view.
+    rm,  remove <INDEX>     Removes an entry from the specified month (default
+                            is the current month) of the specified list (default
+                            is expenses). <INDEX> is the index of the entry as
+                            displayed in the left column of the detailed list
+                            view.
 
-    c,   convert <INPUT-FILE> <OUTPUT-FILE>
-                            Converts a TSV file into the standard SLF json format.
-
-    lsc, list-categories    Lists all categories of the specified list (default is all
-                            lists).
+    lsc, list-categories    Lists all categories of the specified list (default
+                            is all lists).
 
     ac,  add-category <CATEGORY>
-                            Adds a category named <CATEGORY> to the specified list.
+                            Adds a category named <CATEGORY> to the specified
+                            list.
 
     rmc, remove-category <CATEGORY>
-                            Removes the specified category from the specified list.
-                            <CATEGORY> must be a unique prefix of the given list's
-                            catgories. In particular, it can be the name of the category.
-                            Entries belonging to this category will not be removed,
-                            only their category will be cleared.
+                            Removes the specified category from the specified
+                            list. <CATEGORY> must be a unique prefix of the
+                            given list's categories. In particular, it can be
+                            the name of the category. Entries belonging to this
+                            category will not be removed, only their category
+                            will be cleared.
 
 Options:
-    -h, --help              Prints this help message and exists.
+    -h, --help              Prints this help message and exits.
 
-    -v, --version           Prints version and copyright information and exists.
+    -v, --version           Prints version and copyright information and exits.
 
-    -f, --file <FILE>       Opens the specified file. If this option is not specified, the
-                            file stored in ~/.slfinance/settings.json is loaded.
-                            Accepted by 'list', 'add', 'remove', 'list-categories',
-                            'add-category' and 'remove-category'.
+    -f, --file <FILE>       Opens the specified file. If this option is not
+                            specified, the file stored in
+                            ~/.slfinance/settings.json is loaded.
 
     -t, --total             Specifies the 'total' list.
-                            Accepted by 'list', 'add', 'remove', 'list-categories',
-                            'add-category' and 'remove-category'.
 
     -i, --incomes           Specifies the 'incomes' list.
-                            Accepted by 'list', 'add', 'remove', 'list-categories',
-                            'add-category' and 'remove-category'.
 
     -e, --expenses          Specifies the 'expenses' list.
-                            Accepted by 'list', 'add', 'remove', 'list-categories',
-                            'add-category' and 'remove-category'.
 
     -s, --show-categories   Shows each category in a separate column.
-                            Accepted by 'list'.
 
     -c, --category <CATEGORY>
                             Specifies a category in which to add a new entry.
-                            Accepted by 'add'.
 
     -d, --description <DESCRIPTION>
                             Adds a description when adding an entry.
-                            Accepted by 'add'.
 
-    -D, --date <DATE>       Specifies a date when adding an entry. <DATE> must be in the
-                            format "yyyy-mm-dd". Without this option, the current date
-                            will be used. Use --date "" to insert an entry without a
-                            date. The date must be between Jan 1, 262145 BCE and Dec 31,
-                            262143 CE, inclusive.
-                            Accepted by 'add'.
+    -D, --date <DATE>       Specifies a date when adding an entry. <DATE> can be
+                            one of the following: (a) just an integer, which is
+                            interpreted as the day of the current month, (b) a
+                            full date in the format "yyyy-mm-dd", (c) "." to
+                            specify the current date (the default if this option
+                            is emitted) or (d) "" to add an entry without a
+                            date.
 
-    -m, --month <MONTH>     Specifies a month when adding an entry. This argument cannot
-                            be used in combination with --date. <MONTH> can be a number
-                            from 1 to 12, the start of a month name (e.g. 'jan' or
-                            'January'; the match is case-insensitive) or '.' to specify
-                            the current month. Without the --year flag, the given month
-                            will be combined with the current year.
-                            Accepted by 'list', 'add' and 'remove'.
+    -m, --month <MONTH>     Specifies a month. This argument cannot be used in
+                            combination with --date. <MONTH> can be a number
+                            from 1 to 12, the start of a month name (e.g. 'jan'
+                            or 'January'; the match is case-insensitive) or '.'
+                            to specify the current month. Without the --year
+                            flag, the given month will be combined with the
+                            current year.
 
-    -y, --year <YEAR>       Specifies a year when adding an entry. This argument cannot be
-                            used in combination with --date. <YEAR> can be any integer
-                            between -2147483648 and +2147483647 inclusive or '.' to
-                            specify the current year. Inputs between 0 and 99 inclusive
-                            will be adjusted to the current / last century (i.e. --year 26
-                            will be interpreted as 2026). To avoid this conversion, prefix
-                            the year with a zero: --year 026. The given year will be
-                            combined with the current month.
-                            Accepted by 'list', 'add' and 'remove'.
+    -y, --year <YEAR>       Specifies a year. This argument cannot be used in
+                            combination with --date. <YEAR> can be an integer or
+                            '.' to specify the current year. Inputs between 0
+                            and 99 inclusive will be adjusted to the current /
+                            last century (i.e. --year 26 will be interpreted as
+                            2026). To avoid this conversion, prefix the year
+                            with a zero: --year 026.
+
+    -w, --wide              Make columns for categories and descriptions wider
+                            when viewing a list in detailed view.

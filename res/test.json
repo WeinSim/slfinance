@@ -5,12 +5,12 @@
             "year": 2026,
             "entries": [
                 {
-                    "category": 0,
-                    "amount": "1"
+                    "cat": 0,
+                    "amt": "1"
                 },
                 {
-                    "category": 1,
-                    "amount": "5"
+                    "cat": 1,
+                    "amt": "5"
                 }
             ]
         },
@@ -19,12 +19,12 @@
             "year": 2026,
             "entries": [
                 {
-                    "category": 0,
-                    "amount": "2"
+                    "cat": 0,
+                    "amt": "2"
                 },
                 {
-                    "category": 0,
-                    "amount": "1"
+                    "cat": 0,
+                    "amt": "1"
                 }
             ]
         }
@@ -39,11 +39,11 @@
             "year": 2026,
             "entries": [
                 {
-                    "category": 0,
-                    "amount": "20"
+                    "cat": 0,
+                    "amt": "20"
                 },
                 {
-                    "amount": "10",
+                    "amt": "10",
                     "date": "2026-03-07"
                 }
             ]
@@ -53,10 +53,10 @@
             "year": 2026,
             "entries": [
                 {
-                    "category": 0,
-                    "amount": "5/2+2.30",
+                    "cat": 0,
+                    "amt": "5/2+2.30",
                     "date": "2026-09-16",
-                    "description": "ten euros"
+                    "desc": "ten euros"
                 }
             ]
         }
@@ -70,7 +70,7 @@
             "year": 2026,
             "entries": [
                 {
-                    "amount": "5"
+                    "amt": "5"
                 }
             ]
         }
