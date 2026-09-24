@@ -101,7 +101,9 @@ impl MoneyList {
                 self.categories.len(),
             ));
         }
-        self.entries.entry(year_month).or_default().push(entry);
+        let list = self.entries.entry(year_month).or_default();
+        list.push(entry);
+        list.sort();
         Ok(())
     }
 
@@ -320,6 +322,30 @@ pub struct MoneyChange {
     pub date: Option<NaiveDate>,
     pub category_id: Option<usize>,
     pub description: Option<String>,
+}
+
+impl PartialEq for MoneyChange {
+    fn eq(&self, other: &Self) -> bool {
+        self.date == other.date
+    }
+}
+
+impl Eq for MoneyChange {
+}
+
+impl PartialOrd for MoneyChange {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for MoneyChange {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let default_date = NaiveDate::MIN;
+        self.date
+            .unwrap_or(default_date)
+            .cmp(&other.date.unwrap_or(default_date))
+    }
 }
 
 #[derive(Clone, Copy, Default)]

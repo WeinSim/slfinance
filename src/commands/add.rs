@@ -1,6 +1,7 @@
 use chrono::Local;
 
 use crate::{
+    TODAY,
     commands::{Arguments, MoneyListType, save_tracker},
     expressions::Expression,
     money::{MoneyChange, Tracker, YearMonth},
@@ -19,14 +20,13 @@ pub fn add(
         None => None,
     };
     let given_ym = args.get_year_month();
-    let today = Local::now().date_naive();
     let date = args.date.unwrap_or(match given_ym {
         Some(_) => None,
-        None if list.allow_dates() => Some(today),
+        None if list.allow_dates() => Some(*TODAY),
         None => None,
     });
     list.add_entry(
-        given_ym.unwrap_or(YearMonth::from_naive_date(date.unwrap_or(today))),
+        given_ym.unwrap_or(YearMonth::from_naive_date(date.unwrap_or(*TODAY))),
         MoneyChange {
             amount: expression.clone(),
             date,

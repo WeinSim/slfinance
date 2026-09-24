@@ -7,7 +7,7 @@ mod remove;
 use chrono::{Datelike, Local, Month, NaiveDate};
 
 use crate::{
-    CONFIG, MONTHS, SETTINGS, SETTINGS_PATH,
+    CONFIG, MONTHS, SETTINGS, SETTINGS_PATH, TODAY,
     commands::{
         add::add,
         categories::{add_category, remove_category},
@@ -114,9 +114,7 @@ impl Arguments {
     pub fn get_year_month(&self) -> Option<YearMonth> {
         self.month.map(|month| YearMonth {
             month,
-            year: self
-                .year
-                .unwrap_or_else(|| Local::now().date_naive().year()),
+            year: self.year.unwrap_or_else(|| TODAY.year()),
         })
     }
 
@@ -244,6 +242,10 @@ impl Arguments {
     }
 
     fn parse_month(s: &str) -> Result<Month, String> {
+        // "." defaults to the current month
+        if s == "." {
+            return Ok(YearMonth::month_from_naive_date(*TODAY));
+        }
         // first check if input is a valid month number (1 - 12)
         if let Ok(i) = s.parse::<u8>()
             && let Ok(month) = Month::try_from(i)
@@ -264,11 +266,17 @@ impl Arguments {
     }
 
     fn parse_year(s: &str) -> Result<i32, String> {
+        // "." defaults to the current year
+        let current_year = TODAY.year();
+        if s == "." {
+            return Ok(current_year);
+        }
+        // if the input starts with a 0, we always return it as is
         let parsed = s.parse::<i32>().map_err(|e| e.to_string());
         if s.starts_with('0') {
             return parsed;
         }
-        let current_year = Local::now().date_naive().year();
+        // otherwise, we adjust values between 0 - 99 to the most reasonable century
         let current_century = (current_year / 100) * 100;
         Ok(match parsed? {
             y if y <= current_year % 100 => y + current_century,
@@ -348,7 +356,7 @@ impl Command {
                 add(
                     args,
                     &mut load_tracker(args)?,
-                    args.get_list_type()?,
+                    args.get_list_type().unwrap_or(MoneyListType::Expenses),
                     args.category.as_deref(),
                     expression,
                 )?;
@@ -359,7 +367,7 @@ impl Command {
                 };
                 remove(
                     &mut load_tracker(args)?,
-                    args.get_list_type()?,
+                    args.get_list_type().unwrap_or(MoneyListType::Expenses),
                     year_month,
                     *index,
                 )?;

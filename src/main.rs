@@ -5,7 +5,7 @@ use std::{
     sync::{LazyLock, RwLock},
 };
 
-use chrono::Month;
+use chrono::{Local, Month, NaiveDate};
 
 mod commands;
 mod expressions;
@@ -36,6 +36,7 @@ const MONTHS: [Month; 12] = [
 static CONFIG: LazyLock<Config> = LazyLock::new(init_config);
 static SETTINGS: LazyLock<RwLock<Settings>> = LazyLock::new(load_settings);
 static SETTINGS_PATH: LazyLock<Option<PathBuf>> = LazyLock::new(get_settings_path);
+static TODAY: LazyLock<NaiveDate> = LazyLock::new(|| Local::now().date_naive());
 
 fn main() -> ExitCode {
     if DEV_BUILD {
@@ -53,8 +54,8 @@ fn main() -> ExitCode {
 
 fn run(args_raw: &[String]) -> Result<(), String> {
     // let args = Arguments {
-    //     command: Some(List),
-    //     month: Some(September),
+    //     command: Add(1),
+    //     description: Some("test".to_owned()),
     //     ..Default::default()
     // };
     let args = Arguments::parse(args_raw)?;
