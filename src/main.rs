@@ -33,7 +33,10 @@ const MONTHS: [Month; 12] = [
     Month::December,
 ];
 
-static CONFIG: LazyLock<Config> = LazyLock::new(init_config);
+static CONFIG: Config = Config {
+    help_message: include_str!("resources/help.txt"),
+    version_message: include_str!("resources/version.txt"),
+};
 static SETTINGS: LazyLock<RwLock<Settings>> = LazyLock::new(load_settings);
 static SETTINGS_PATH: LazyLock<Option<PathBuf>> = LazyLock::new(get_settings_path);
 static TODAY: LazyLock<NaiveDate> = LazyLock::new(|| Local::now().date_naive());
@@ -75,7 +78,7 @@ fn run(args_raw: &[String]) -> Result<(), String> {
     if let Some(ref command) = args.command {
         command.run(&args)
     } else {
-        Err(CONFIG.help_message.clone())
+        Err(CONFIG.help_message.to_owned())
     }
 }
 
@@ -88,17 +91,8 @@ fn print_version() {
 }
 
 struct Config {
-    help_message: String,
-    version_message: String,
-}
-
-fn init_config() -> Config {
-    Config {
-        help_message: fs::read_to_string("res/help.txt")
-            .unwrap_or("[Unable to load help message]".to_owned()),
-        version_message: fs::read_to_string("res/version.txt")
-            .unwrap_or("[Unable to load version message]".to_owned()),
-    }
+    help_message: &'static str,
+    version_message: &'static str,
 }
 
 fn get_settings_path() -> Option<PathBuf> {

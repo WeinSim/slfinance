@@ -4,7 +4,7 @@ mod convert;
 mod list;
 mod remove;
 
-use chrono::{Datelike, Local, Month, NaiveDate};
+use chrono::{Datelike, Month, NaiveDate};
 
 use crate::{
     CONFIG, MONTHS, SETTINGS, SETTINGS_PATH, TODAY,
@@ -136,7 +136,7 @@ impl Arguments {
                 args.command = Some(Command::parse(&mut iter)?);
             }
         } else {
-            return Err(CONFIG.help_message.clone());
+            return Err(CONFIG.help_message.to_owned());
         }
         // parse remaining arguments
         loop {

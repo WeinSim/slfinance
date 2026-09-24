@@ -192,7 +192,7 @@ impl MoneyList {
 
     pub fn remove_category(&mut self, cat_id: usize) {
         self.categories.remove(cat_id);
-        for (_, vec) in &mut self.entries {
+        for vec in self.entries.values_mut() {
             for mc in vec.iter_mut() {
                 match mc.category_id {
                     Some(i) if i == cat_id => mc.category_id = None,
