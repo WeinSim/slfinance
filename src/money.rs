@@ -105,6 +105,22 @@ impl MoneyList {
         Ok(())
     }
 
+    pub fn remove_entry(&mut self, year_month: YearMonth, index: usize) -> Result<(), String> {
+        let Some(entries) = self.entries.get_mut(&year_month) else {
+            return Err(format!("no entries for {year_month}"));
+        };
+        if index < entries.len() {
+            entries.remove(index);
+            Ok(())
+        } else {
+            Err(format!(
+                "index out of range: index = {}, len = {}",
+                index,
+                entries.len()
+            ))
+        }
+    }
+
     pub fn sum(&self, year_month: &YearMonth) -> Money {
         self.entries
             .get(year_month)

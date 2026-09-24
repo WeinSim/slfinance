@@ -1,7 +1,8 @@
 mod add;
-mod add_remove_categories;
+mod categories;
 mod convert;
 mod list;
+mod remove;
 
 use chrono::{Datelike, Local, Month, NaiveDate};
 
@@ -9,9 +10,10 @@ use crate::{
     CONFIG, MONTHS, SETTINGS, SETTINGS_PATH,
     commands::{
         add::add,
-        add_remove_categories::{add_category, remove_category},
+        categories::{add_category, remove_category},
         convert::convert,
         list::{list, list_categories},
+        remove::remove,
     },
     expressions::Expression,
     money::{Tracker, YearMonth},
@@ -175,10 +177,6 @@ impl Arguments {
                 Arg::Short('y') | Arg::Long("year") => {
                     Self::set_arg(&mut args.year, &mut iter, Self::parse_year, "year")?;
                 }
-                Arg::Long("month-year") => {
-                    Self::set_arg(&mut args.month, &mut iter, Self::parse_month, "month")?;
-                    Self::set_arg(&mut args.year, &mut iter, Self::parse_year, "year")?;
-                }
                 Arg::Short(c) => return Err(format!("unknown argument: '-{c}'")),
                 Arg::Long(n) => return Err(format!("unknown argument: '--{n}'")),
                 Arg::Invalid(a) => return Err(format!("invalid argument: '{a}'")),
@@ -283,6 +281,7 @@ impl Arguments {
 pub(crate) enum Command {
     List,
     Add(Expression),
+    Remove(usize),
     Convert(String, String),
     ListCategories,
     AddCategory(String),
@@ -306,22 +305,30 @@ impl Parse for Command {
     fn parse(iter: &mut ArgsIter) -> Result<Self, String> {
         if let Some(command) = iter.next() {
             match command {
-                "list" => Ok(Self::List),
-                "add" => {
+                "ls" | "list" => Ok(Self::List),
+                "a" | "add" => {
                     let formula = iter.next().ok_or("expected formula")?.parse()?;
                     Ok(Self::Add(formula))
                 }
-                "convert" => {
+                "rm" | "remove" => {
+                    let index = iter
+                        .next()
+                        .ok_or("expected index")?
+                        .parse::<usize>()
+                        .map_err(|e| e.to_string())?;
+                    Ok(Self::Remove(index))
+                }
+                "c" | "convert" => {
                     let input_file = iter.next().ok_or("expected input file")?.to_owned();
                     let output_file = iter.next().ok_or("expected output file")?.to_owned();
                     Ok(Self::Convert(input_file, output_file))
                 }
-                "list-categories" => Ok(Self::ListCategories),
-                "add-category" => {
+                "lsc" | "list-categories" => Ok(Self::ListCategories),
+                "ac" | "add-category" => {
                     let category = iter.next().ok_or("expected category name")?.to_owned();
                     Ok(Self::AddCategory(category))
                 }
-                "remove-category" => {
+                "rmc" | "remove-category" => {
                     let category = iter.next().ok_or("expected category name")?.to_owned();
                     Ok(Self::RemoveCategory(category))
                 }
@@ -344,6 +351,17 @@ impl Command {
                     args.get_list_type()?,
                     args.category.as_deref(),
                     expression,
+                )?;
+            }
+            Self::Remove(index) => {
+                let Some(year_month) = args.get_year_month() else {
+                    return Err("missing --month argument".to_owned());
+                };
+                remove(
+                    &mut load_tracker(args)?,
+                    args.get_list_type()?,
+                    year_month,
+                    *index,
                 )?;
             }
             Self::Convert(input_file, output_file) => convert(input_file, output_file)?,

@@ -2,35 +2,36 @@ Usage:
     slfinance [<command>] [<options>]
 
 Commands:
-    list                    Prints an overview of the current tracker.
-                            With the --month or --year flags given, prints individual
-                            entries of only the given month.
+    ls,  list               Prints an overview of the current tracker.
+                            With the --month flag, prints a detailed view of the specified
+                            month.
 
-    add <category> <amount>
-                            Adds an entry to the specified list (see --total, --incomes
-                            and --expenses). If <category> doesn't exist, a new category
-                            will be created. If no date or month / year is specified, the
-                            entry will be inserted into the current month / year. <amount>
-                            can be literal (with '.' as the decimal point) or a formula
-                            consisting of literals , addition, subtraction, right
-                            multiplication and division by integers as well as
-                            parentheses.
+    a,   add <amount>       Adds an entry to the specified list. If no date or month /
+                            year is specified, the entry will be inserted into the current
+                            month / year. <amount> can be literal (with '.' as the decimal
+                            point) or a formula consisting of literals , addition,
+                            subtraction, right multiplication and division by integers as
+                            well as parentheses.
 
-    convert <input-file> <output-file>
+    rm,  remove <index>     Removes an entry from the specified month of the specified
+                            list. <index> is the index of the entry as displayed in the
+                            left column of the detailed list view.
+
+    c,   convert <input-file> <output-file>
                             Converts a TSV file into the standard SLF json format.
 
-    list-categories         Lists all categories of the specified list (see --total,
-                            --incomes and --expenses).
+    lsc, list-categories    Lists all categories of the specified list.
 
-    add-category <category>
+    ac,  add-category <category>
                             Adds a category named <category> to the specified list (see
                             --total, --incomes and --expenses).
 
-    remove-category <category>
-                            Removes the specified category from the specified list (see
-                            --total, --incomes and --expenses). <catgory> must be a unique
-                            prefix of the given list's catgories. In particular, it can be
-                            the name of the category.
+    rmc, remove-category <category>
+                            Removes the specified category from the specified list.
+                            <catgory> must be a unique prefix of the given list's
+                            catgories. In particular, it can be the name of the category.
+                            Entries belonging to this category will not be removed,
+                            only their category will be cleared.
 
 Options:
     -h, --help              Prints this help message and exists.
@@ -39,20 +40,20 @@ Options:
 
     -f, --file <file>       Opens the specified file. If this option is not specified, the
                             file stored in ~/.slfinance/settings.json is loaded.
-                            Accepted by 'list', 'add', 'list-categories', 'add-category'
-                            and 'remove-category'.
+                            Accepted by 'list', 'add', 'remove', 'list-categories',
+                            'add-category' and 'remove-category'.
 
     -t, --total             Adds to the / shows the 'total' list.
-                            Accepted by 'list', 'add', 'list-categories', 'add-category'
-                            and 'remove-category'.
+                            Accepted by 'list', 'add', 'remove', 'list-categories',
+                            'add-category' and 'remove-category'.
 
     -i, --incomes           Adds to the / shows the 'incomes' list.
-                            Accepted by 'list', 'add', 'list-categories', 'add-category'
-                            and 'remove-category'.
+                            Accepted by 'list', 'add', 'remove', 'list-categories',
+                            'add-category' and 'remove-category'.
 
     -e, --expenses          Adds to the / shows the 'expenses' list.
-                            Accepted by 'list', 'add', 'list-categories', 'add-category'
-                            and 'remove-category'.
+                            Accepted by 'list', 'add', 'remove', 'list-categories',
+                            'add-category' and 'remove-category'.
 
     -s, --show-categories   Shows each category in a separate column.
                             Accepted by 'list'.
@@ -77,7 +78,7 @@ Options:
                             number from 1 to 12 or the start of a month name, e.g. 'jan'
                             or 'January'. The match is case-insensitive. The given month
                             will be combined with the current year.
-                            Accepted by 'list' and 'add'.
+                            Accepted by 'list', 'add' and 'remove'.
 
     -y, --year <year>       Specifies a year when adding an entry. This argument cannot be
                             used in combination with --date. <year> can be any integer
@@ -86,8 +87,4 @@ Options:
                             century (i.e. --year 26 will be interpreted as 2026). To avoid
                             this conversion, prefix the year with a zero: --year 026. The
                             given year will be combined with the current month.
-                            Accepted by 'list' and 'add'.
-
-        --month-year <month> <year>
-                            Combination of --month and --year.
-                            Accepted by 'list' and 'add'.
+                            Accepted by 'list', 'add' and 'remove'.
