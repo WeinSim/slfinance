@@ -130,7 +130,7 @@ pub fn list_categories(args: &Arguments, tracker: &Tracker) -> Result<(), String
     Ok(())
 }
 
-fn get_specified_lists<'a>(
+pub fn get_specified_lists<'a>(
     args: &Arguments,
     tracker: &'a Tracker,
 ) -> Vec<(&'a MoneyList, &'static str)> {
@@ -167,7 +167,7 @@ struct Header<'a> {
     lines: Option<(usize, Vec<&'a str>)>,
 }
 
-enum RowKey<K> {
+pub enum RowKey<K> {
     Key(K),
     Dots,
 }
@@ -223,7 +223,7 @@ impl Cell {
 }
 
 impl RowKey<YearMonth> {
-    fn from_year_months(year_months: &[YearMonth]) -> Vec<Self> {
+    pub fn from_year_months(year_months: &[YearMonth]) -> Vec<Self> {
         let mut row_keys: Vec<_> = year_months.iter().map(|ym| RowKey::Key(*ym)).collect();
         let mut i: usize = 0;
         while i < row_keys.len() - 1 {
@@ -244,6 +244,18 @@ impl RowKey<YearMonth> {
             i += 1;
         }
         row_keys
+    }
+}
+
+impl<K> Display for RowKey<K>
+where
+    K: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Key(key) => key.fmt(f),
+            Self::Dots => write!(f, "..."),
+        }
     }
 }
 

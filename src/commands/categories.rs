@@ -1,5 +1,5 @@
 use crate::{
-    commands::{MoneyListType, save_tracker},
+    commands::MoneyListType,
     money::{Category, Tracker},
 };
 
@@ -12,8 +12,7 @@ pub fn add_category(
         .get_mut_money_list(list_type)
         .add_category(Category {
             name: name.to_owned(),
-        })?;
-    save_tracker(tracker)
+        })
 }
 
 pub fn remove_category(
@@ -25,5 +24,5 @@ pub fn remove_category(
     let cat_id = list.find_category_by_prefix(prefix)?;
     println!("Removing category '{}'", list.categories()[cat_id].name);
     list.remove_category(cat_id);
-    save_tracker(tracker)
+    Ok(())
 }

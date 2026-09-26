@@ -1,7 +1,6 @@
-
 use crate::{
     TODAY,
-    commands::{Arguments, MoneyListType, save_tracker},
+    commands::{Arguments, MoneyListType},
     expressions::Expression,
     money::{MoneyChange, Tracker, YearMonth},
 };
@@ -32,6 +31,5 @@ pub fn add(
             category_id: cat_id,
             description: args.description.clone(),
         },
-    )?;
-    save_tracker(tracker)
+    )
 }

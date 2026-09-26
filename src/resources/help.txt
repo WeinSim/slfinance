@@ -9,8 +9,8 @@ Commands:
     a,   add <AMOUNT>       Adds an entry to the specified list (default is
                             expenses). If no date or month / year is specified,
                             the entry will be inserted into the current month /
-                            year. <AMOUNT> can be literal (with '.' as the
-                            decimal point) or a formula consisting of literals ,
+                            year. <AMOUNT> can be a literal (with '.' as the
+                            decimal point) or a formula consisting of literals,
                             addition, subtraction, right multiplication and
                             division by integers as well as parentheses.
 
@@ -19,6 +19,9 @@ Commands:
                             is expenses). <INDEX> is the index of the entry as
                             displayed in the left column of the detailed list
                             view.
+
+    g,   graph              Prints a graph of the specified lists (default is
+                            total).
 
     lsc, list-categories    Lists all categories of the specified list (default
                             is all lists).
@@ -35,10 +38,12 @@ Commands:
                             category will not be removed, only their category
                             will be cleared.
 
-    convert <INPUT_FILE> <OUTPUT_FILE>
+         help               Prints this help message.
+
+         convert <INPUT_FILE> <OUTPUT_FILE>
                             Converts a TSV file into the SLFinance JSON format.
 
-    convert-back <OUTPUT_FILE> <LANGUAGE>
+         convert-back <OUTPUT_FILE> <LANGUAGE>
                             Converts an SLFinance money tracker back into a TSV
                             format. <LANGUAGE> must be either 'german' or
                             'english' and determines month names as well as

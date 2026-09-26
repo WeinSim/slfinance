@@ -2,6 +2,7 @@ mod add;
 mod categories;
 mod convert;
 mod convert_back;
+mod graph;
 mod list;
 mod remove;
 
@@ -14,11 +15,13 @@ use crate::{
         categories::{add_category, remove_category},
         convert::convert,
         convert_back::convert_back,
+        graph::graph,
         list::{list, list_categories},
         remove::remove,
     },
     expressions::Expression,
     money::{Tracker, YearMonth},
+    print_help,
     serial::{self, save_file},
 };
 
@@ -304,11 +307,13 @@ pub(crate) enum Command {
     List,
     Add(Expression),
     Remove(usize),
-    Convert(String, String),
-    ConvertBack(String, bool),
+    Graph,
     ListCategories,
     AddCategory(String),
     RemoveCategory(String),
+    Help,
+    Convert(String, String),
+    ConvertBack(String, bool),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -341,6 +346,17 @@ impl Parse for Command {
                         .map_err(|e| e.to_string())?;
                     Ok(Self::Remove(index))
                 }
+                "g" | "graph" => Ok(Self::Graph),
+                "lsc" | "list-categories" => Ok(Self::ListCategories),
+                "ac" | "add-category" => {
+                    let category = iter.next().ok_or("expected category name")?.to_owned();
+                    Ok(Self::AddCategory(category))
+                }
+                "rmc" | "remove-category" => {
+                    let category = iter.next().ok_or("expected category name")?.to_owned();
+                    Ok(Self::RemoveCategory(category))
+                }
+                "help" => Ok(Self::Help),
                 "convert" => {
                     let input_file = iter.next().ok_or("expected input file")?.to_owned();
                     let output_file = iter.next().ok_or("expected output file")?.to_owned();
@@ -359,15 +375,6 @@ impl Parse for Command {
                     };
                     Ok(Self::ConvertBack(output_file, german))
                 }
-                "lsc" | "list-categories" => Ok(Self::ListCategories),
-                "ac" | "add-category" => {
-                    let category = iter.next().ok_or("expected category name")?.to_owned();
-                    Ok(Self::AddCategory(category))
-                }
-                "rmc" | "remove-category" => {
-                    let category = iter.next().ok_or("expected category name")?.to_owned();
-                    Ok(Self::RemoveCategory(category))
-                }
                 _ => Err(format!("invalid command: '{command}'")),
             }
         } else {
@@ -381,33 +388,45 @@ impl Command {
         match self {
             Self::List => list(args, &load_tracker(args)?),
             Self::Add(expression) => {
+                let tracker = &mut load_tracker(args)?;
                 add(
                     args,
-                    &mut load_tracker(args)?,
+                    tracker,
                     args.get_list_type().unwrap_or(MoneyListType::Expenses),
                     args.category.as_deref(),
                     expression,
                 )?;
+                save_tracker(tracker)?;
             }
             Self::Remove(index) => {
+                let tracker = &mut load_tracker(args)?;
                 let year_month = args
                     .get_year_month()
                     .unwrap_or(YearMonth::from_naive_date(*TODAY));
                 remove(
-                    &mut load_tracker(args)?,
+                    tracker,
                     args.get_list_type().unwrap_or(MoneyListType::Expenses),
                     year_month,
                     *index,
                 )?;
+                save_tracker(tracker)?;
             }
-            Self::Convert(input_file, output_file) => convert(input_file, output_file)?,
-            Self::ConvertBack(output_file, german) => convert_back(&mut load_tracker(args)?, output_file, *german)?,
+            Self::Graph => graph(&load_tracker(args)?, &args)?,
             Self::ListCategories => list_categories(args, &load_tracker(args)?)?,
             Self::AddCategory(name) => {
-                add_category(&mut load_tracker(args)?, name, args.get_list_type()?)?
+                let tracker = &mut load_tracker(args)?;
+                add_category(tracker, name, args.get_list_type()?)?;
+                save_tracker(tracker)?;
             }
             Self::RemoveCategory(name) => {
-                remove_category(&mut load_tracker(args)?, name, args.get_list_type()?)?
+                let tracker = &mut load_tracker(args)?;
+                remove_category(&mut load_tracker(args)?, name, args.get_list_type()?)?;
+                save_tracker(tracker)?;
+            }
+            Self::Help => print_help(),
+            Self::Convert(input_file, output_file) => convert(input_file, output_file)?,
+            Self::ConvertBack(output_file, german) => {
+                convert_back(&mut load_tracker(args)?, output_file, *german)?
             }
         }
         // save settings file

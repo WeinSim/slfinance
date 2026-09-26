@@ -8,20 +8,19 @@ be incorrect.
 
 ## Basic structure
 
-SLFinance operates on money **trackers**. Every tracker has three money
-**lists**: one for the total money at the beginning of every month ("total"),
-one for incomes ("incomes") and one for expenses ("expenses"). A list can have a
-number of **entries** for every month. An entry always has an amount of money
+SLFinance operates on money **trackers**. A tracker has three money **lists**:
+one for the total money at the beginning of every month ("total"), one for
+incomes ("incomes") and one for expenses ("expenses"). A list can have a number
+of **entries** for every month. An entry always has an amount of money
 associated with it (which can be specified directly or as a simple
 [formula](#formulas)). An entry can optionally have associated with it the
 following things:
-- A date (not possible in the "total" list, where each entry is assumed to be on
+- a date (not possible in the "total" list, where each entry is assumed to be on
 the first day of the corresponding month)
-- A description
-- A category (every list has separate categories)
+- a description
+- a category (every list has separate categories)
 
 ```
-Tracker
 Tracker
 ├── Total (list)
 │   ├── Entries for Jan 26
@@ -49,7 +48,7 @@ time `slfinance` is run.
 
 ## Commands
 
-For an explanation of all commands and arguments, run `slfinance --help` or read
+For an explanation of all commands and arguments, run `slfinance --help` or view
 the [help message](src/resources/help.txt) directly.
 
 ## Formulas
@@ -74,6 +73,5 @@ division = expression '/' int
 
 money = int [('.' | ',') digit digit]
 int = ['+' | '-'] {digit} digit
-int = {digit} digit
 digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
 ```

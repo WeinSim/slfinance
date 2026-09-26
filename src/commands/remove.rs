@@ -1,5 +1,5 @@
 use crate::{
-    commands::{MoneyListType, save_tracker},
+    commands::MoneyListType,
     money::{Tracker, YearMonth},
 };
 
@@ -10,6 +10,5 @@ pub fn remove(
     index: usize,
 ) -> Result<(), String> {
     let list = tracker.get_mut_money_list(list_type);
-    list.remove_entry(year_month, index)?;
-    save_tracker(tracker)
+    list.remove_entry(year_month, index)
 }
