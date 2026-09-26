@@ -211,6 +211,10 @@ impl MoneyList {
         &self.entries
     }
 
+    pub fn entries_mut(&mut self) -> & mut HashMap<YearMonth, Vec<MoneyChange>> {
+        &mut self.entries
+    }
+
     pub fn allow_dates(&self) -> bool {
         self.allow_dates
     }

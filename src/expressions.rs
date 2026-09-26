@@ -89,7 +89,11 @@ fn parse_expression(iter: &mut CharIter) -> Result<Expression, String> {
             } // c => return Err(format!("unexpected character: {c}")),
         }
     }
-    Ok(Expression::Sum(terms))
+    if terms.len() == 1 && terms[0].sign == Sign::Positive {
+        Ok(terms[0].expression.clone())
+    } else {
+        Ok(Expression::Sum(terms))
+    }
 }
 
 fn parse_term(iter: &mut CharIter) -> Result<Expression, String> {

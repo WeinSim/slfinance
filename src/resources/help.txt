@@ -35,6 +35,15 @@ Commands:
                             category will not be removed, only their category
                             will be cleared.
 
+    convert <INPUT_FILE> <OUTPUT_FILE>
+                            Converts a TSV file into the SLFinance JSON format.
+
+    convert-back <OUTPUT_FILE> <LANGUAGE>
+                            Converts an SLFinance money tracker back into a TSV
+                            format. <LANGUAGE> must be either 'german' or
+                            'english' and determines month names as well as
+                            decimal points of the output.
+
 Options:
     -h, --help              Prints this help message and exits.
 
@@ -82,5 +91,5 @@ Options:
                             2026). To avoid this conversion, prefix the year
                             with a zero: --year 026.
 
-    -w, --wide              Make columns for categories and descriptions wider
+    -w, --wide              Makes columns for categories and descriptions wider
                             when viewing a list in detailed view.

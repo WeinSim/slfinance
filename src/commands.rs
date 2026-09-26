@@ -1,6 +1,7 @@
 mod add;
 mod categories;
 mod convert;
+mod convert_back;
 mod list;
 mod remove;
 
@@ -12,6 +13,7 @@ use crate::{
         add::add,
         categories::{add_category, remove_category},
         convert::convert,
+        convert_back::convert_back,
         list::{list, list_categories},
         remove::remove,
     },
@@ -303,6 +305,7 @@ pub(crate) enum Command {
     Add(Expression),
     Remove(usize),
     Convert(String, String),
+    ConvertBack(String, bool),
     ListCategories,
     AddCategory(String),
     RemoveCategory(String),
@@ -342,6 +345,19 @@ impl Parse for Command {
                     let input_file = iter.next().ok_or("expected input file")?.to_owned();
                     let output_file = iter.next().ok_or("expected output file")?.to_owned();
                     Ok(Self::Convert(input_file, output_file))
+                }
+                "convert-back" => {
+                    let output_file = iter.next().ok_or("expected output file")?.to_owned();
+                    let german = match iter.next() {
+                        Some("english") => false,
+                        Some("german") => true,
+                        _ => {
+                            return Err("Must specify either 'english' or 'german' as language:
+                        slfinance convert-back <OUTPUT_FILE> english"
+                                .to_owned());
+                        }
+                    };
+                    Ok(Self::ConvertBack(output_file, german))
                 }
                 "lsc" | "list-categories" => Ok(Self::ListCategories),
                 "ac" | "add-category" => {
@@ -385,6 +401,7 @@ impl Command {
                 )?;
             }
             Self::Convert(input_file, output_file) => convert(input_file, output_file)?,
+            Self::ConvertBack(output_file, german) => convert_back(&mut load_tracker(args)?, output_file, *german)?,
             Self::ListCategories => list_categories(args, &load_tracker(args)?)?,
             Self::AddCategory(name) => {
                 add_category(&mut load_tracker(args)?, name, args.get_list_type()?)?

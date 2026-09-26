@@ -3,9 +3,6 @@
 ### Continue
 
 ### Features to add
-- slf convert
-    - Option to convert back from .json to .tsv (or .csv) to import data back in
-      excel
 - slf edit
     - Specify an existing entry just like in slf remove
     - Change / remove: amount, date, category, description (basically
@@ -15,8 +12,6 @@
 - slf list
     - For detailed display: if only one list type is given, show sums for
     individual categories in addition to final sum?
-        - This would require everything to be sorted by category first, not by
-          date first. Yes, that's probably better.
     - Options to filter displayed entries, e.g. by category or date?
 - slf edit-category
     - Change a category's name
