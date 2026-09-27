@@ -101,10 +101,10 @@ enum Arg<'a> {
 #[derive(Default)]
 pub struct Arguments {
     pub command: Option<Command>,
-    pub version: Option<bool>,
-    pub help: Option<bool>,
+    pub version: bool,
+    pub help: bool,
     pub file: Option<String>,
-    pub show_categories: Option<bool>,
+    pub show_categories: bool,
     pub category: Option<String>,
     pub total: bool,
     pub incomes: bool,
@@ -113,7 +113,7 @@ pub struct Arguments {
     pub date: Option<Option<NaiveDate>>,
     pub month: Option<Month>,
     pub year: Option<i32>,
-    pub wide: Option<bool>,
+    pub wide: bool,
 }
 
 impl Arguments {
@@ -124,13 +124,40 @@ impl Arguments {
         })
     }
 
-    pub fn get_list_type(&self) -> Result<MoneyListType, String> {
-        match (&self.total, &self.incomes, &self.expenses) {
+    pub fn get_unique_list_type(&self) -> Result<MoneyListType, String> {
+        match (self.total, self.incomes, self.expenses) {
             (true, false, false) => Ok(MoneyListType::Total),
             (false, true, false) => Ok(MoneyListType::Incomes),
             (false, false, true) => Ok(MoneyListType::Expenses),
             _ => Err("must specify exactly one of --total, --incomes or --expenses".to_owned()),
         }
+    }
+
+    pub fn get_list_types(&self) -> Vec<MoneyListType> {
+        [
+            (self.total, MoneyListType::Total),
+            (self.incomes, MoneyListType::Incomes),
+            (self.expenses, MoneyListType::Expenses),
+        ]
+        .iter()
+        .filter_map(|(a, t)| if *a { Some(*t) } else { None })
+        .collect()
+    }
+
+    pub fn get_list_types_or(&self, default: Vec<MoneyListType>) -> Vec<MoneyListType> {
+        let types = self.get_list_types();
+        match types.len() {
+            0 => default,
+            _ => types,
+        }
+    }
+
+    pub fn get_list_types_or_all(&self) -> Vec<MoneyListType> {
+        self.get_list_types_or(vec![
+            MoneyListType::Total,
+            MoneyListType::Incomes,
+            MoneyListType::Expenses,
+        ])
     }
 
     pub fn parse(args_raw: &[String]) -> Result<Self, String> {
@@ -147,20 +174,15 @@ impl Arguments {
         // parse remaining arguments
         loop {
             match iter.next_arg() {
-                Arg::Short('v') | Arg::Long("version") => {
-                    Self::set(&mut args.version, true, "version")?
-                }
-                Arg::Short('h') | Arg::Long("help") => Self::set(&mut args.help, true, "help")?,
+                Arg::Short('v') | Arg::Long("version") => args.version = true,
+                Arg::Short('h') | Arg::Long("help") => args.help = true,
                 Arg::Short('f') | Arg::Long("file") => {
                     Self::set_arg(&mut args.file, &mut iter, Self::parse_str, "file")?
                 }
-                Arg::Short('s') | Arg::Long("show-categories") => {
-                    Self::set(&mut args.show_categories, true, "show-categories")?
-                }
+                Arg::Short('s') | Arg::Long("show-categories") => args.show_categories = true,
                 Arg::Short('c') | Arg::Long("category") => {
                     Self::set_arg(&mut args.category, &mut iter, Self::parse_str, "category")?
                 }
-                // no duplicate checks for these three
                 Arg::Short('t') | Arg::Long("total") => args.total = true,
                 Arg::Short('i') | Arg::Long("incomes") => args.incomes = true,
                 Arg::Short('e') | Arg::Long("expenses") => args.expenses = true,
@@ -181,19 +203,12 @@ impl Arguments {
                 Arg::Short('y') | Arg::Long("year") => {
                     Self::set_arg(&mut args.year, &mut iter, Self::parse_year, "year")?;
                 }
-                Arg::Short('w') | Arg::Long("wide") => Self::set(&mut args.wide, true, "wide")?,
+                Arg::Short('w') | Arg::Long("wide") => args.wide = true,
                 Arg::Short(c) => return Err(format!("unknown argument: '-{c}'")),
                 Arg::Long(n) => return Err(format!("unknown argument: '--{n}'")),
                 Arg::Invalid(a) => return Err(format!("invalid argument: '{a}'")),
                 Arg::None => break,
             }
-        }
-        // if neither of --total, --incomes and --expenses were given, all three are set
-        // to true
-        if !(args.total || args.incomes || args.expenses) {
-            args.total = true;
-            args.incomes = true;
-            args.expenses = true;
         }
         if args.date.is_some() {
             if args.month.is_some() {
@@ -323,6 +338,16 @@ pub(crate) enum MoneyListType {
     Expenses,
 }
 
+impl MoneyListType {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Total => "Total",
+            Self::Incomes => "Incomes",
+            Self::Expenses => "Expenses",
+        }
+    }
+}
+
 trait Parse {
     fn parse(iter: &mut ArgsIter) -> Result<Self, String>
     where
@@ -392,7 +417,8 @@ impl Command {
                 add(
                     args,
                     tracker,
-                    args.get_list_type().unwrap_or(MoneyListType::Expenses),
+                    args.get_unique_list_type()
+                        .unwrap_or(MoneyListType::Expenses),
                     args.category.as_deref(),
                     expression,
                 )?;
@@ -405,7 +431,8 @@ impl Command {
                     .unwrap_or(YearMonth::from_naive_date(*TODAY));
                 remove(
                     tracker,
-                    args.get_list_type().unwrap_or(MoneyListType::Expenses),
+                    args.get_unique_list_type()
+                        .unwrap_or(MoneyListType::Expenses),
                     year_month,
                     *index,
                 )?;
@@ -415,12 +442,12 @@ impl Command {
             Self::ListCategories => list_categories(args, &load_tracker(args)?)?,
             Self::AddCategory(name) => {
                 let tracker = &mut load_tracker(args)?;
-                add_category(tracker, name, args.get_list_type()?)?;
+                add_category(tracker, name, args.get_unique_list_type()?)?;
                 save_tracker(tracker)?;
             }
             Self::RemoveCategory(name) => {
                 let tracker = &mut load_tracker(args)?;
-                remove_category(&mut load_tracker(args)?, name, args.get_list_type()?)?;
+                remove_category(&mut load_tracker(args)?, name, args.get_unique_list_type()?)?;
                 save_tracker(tracker)?;
             }
             Self::Help => print_help(),

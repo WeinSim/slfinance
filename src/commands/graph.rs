@@ -2,21 +2,19 @@ use owo_colors::OwoColorize;
 use std::{collections::HashMap, fmt::Display, sync::LazyLock};
 
 use crate::{
-    commands::{
-        Arguments,
-        list::{RowKey, get_specified_lists},
-    },
+    commands::{Arguments, MoneyListType, list::RowKey},
     money::{Money, MoneyList, Tracker, YearMonth},
 };
 
 static DISPLAY_VALUES: LazyLock<Vec<Money>> = LazyLock::new(get_display_values);
 
 pub fn graph(tracker: &Tracker, args: &Arguments) -> Result<(), String> {
-    // TODO: this would select all lists if none is specified. we want only the total in this case
-    for (list, name) in get_specified_lists(args, tracker) {
+    for (list, name) in
+        tracker.get_money_lists(&args.get_list_types_or(vec![MoneyListType::Expenses]))
+    {
         let graph = Graph::new(list, args.year);
         println!("{}", name.bold());
-        graph.print(args.show_categories.is_some(), 13, 3, 2, 1, 40);
+        graph.print(args.show_categories, 13, 3, 2, 1, 40);
     }
     Ok(())
 }
@@ -103,8 +101,11 @@ impl<'a> Graph<'a> {
                 let (c, color_id) = match key {
                     RowKey::Key(ym) => {
                         let (m, cat) = self.values.get(ym).unwrap();
-                        let c = if money <= *m { '#' } else { ' ' };
-                        (c, cat.partition_point(|m| *m <= money) + 1)
+                        if money <= *m {
+                            ('#', cat.partition_point(|m| *m <= money) + 1)
+                        } else {
+                            (' ', 0)
+                        }
                     }
                     _ => (' ', 0),
                 };

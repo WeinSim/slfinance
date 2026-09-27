@@ -14,6 +14,15 @@ Commands:
                             addition, subtraction, right multiplication and
                             division by integers as well as parentheses.
 
+    e,   edit <INDEX>       Changes an entry's attributes. Attributes can be set
+                            with their corresponding flags (--amount,
+                            --category, --description, --date, --year, --month).
+                            <INDEX> is the index of the entry as displayed in
+                            the left column of the detailed list view. The entry
+                            is taken from the specified month (default is the
+                            current month) of the specified list (default is
+                            expenses).
+
     rm,  remove <INDEX>     Removes an entry from the specified month (default
                             is the current month) of the specified list (default
                             is expenses). <INDEX> is the index of the entry as
@@ -95,6 +104,9 @@ Options:
                             last century (i.e. --year 26 will be interpreted as
                             2026). To avoid this conversion, prefix the year
                             with a zero: --year 026.
+
+    -a, --amount <AMOUNT>   Changes an entry's amount. <AMOUNT> can be a formula
+                            just like with 'slf add'.
 
     -w, --wide              Makes columns for categories and descriptions wider
                             when viewing a list in detailed view.

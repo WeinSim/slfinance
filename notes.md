@@ -1,8 +1,6 @@
 # SLFinance
 
 ### Continue
-- Display / export graphs
-    - svg
 
 ### Features to add
 - slf edit
@@ -32,6 +30,8 @@
     - create a new tracker
 - slf edit-category
     - Change a category's name
+- Display / export graphs
+    - svg
 - Encrypted save files?
     - For now, I will probably just use age externally. Maybe this could be
     integrated into slfinance in the future. But it would perhaps just end up

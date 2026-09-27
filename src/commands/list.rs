@@ -2,6 +2,7 @@ use owo_colors::OwoColorize;
 use std::fmt::{Display, Write};
 use std::{collections::HashMap, hash::Hash};
 
+use crate::commands::MoneyListType;
 use crate::money::MoneyChange;
 use crate::{
     commands::Arguments,
@@ -23,7 +24,6 @@ pub fn list(args: &Arguments, tracker: &Tracker) {
 }
 
 fn list_all(args: &Arguments, tracker: &Tracker) {
-    let show_categories = args.show_categories.unwrap_or(false);
     let year_months = if let Some(year) = args.year {
         tracker
             .get_year_months()
@@ -38,12 +38,16 @@ fn list_all(args: &Arguments, tracker: &Tracker) {
     // can fit at most -999,999.99€
     table.key_width = 8;
     table.key_prec = 3;
-    if args.total {
-        table.add_money_list(&tracker.total, "Total", show_categories, true);
+    let list_types = args.get_list_types_or_all();
+    let show_total = list_types.contains(&MoneyListType::Total);
+    let show_incomes = list_types.contains(&MoneyListType::Incomes);
+    let show_expenses = list_types.contains(&MoneyListType::Expenses);
+    if show_total {
+        table.add_money_list(&tracker.total, "Total", args.show_categories, true);
         table.add_money_column("Change", true, |ym| tracker.get_total_change(ym), true);
     }
-    if args.incomes && args.expenses {
-        if args.total {
+    if show_incomes && show_expenses {
+        if show_total {
             table.add_money_column("Diff", true, |ym| tracker.get_diff_total_change(ym), true);
         }
         table.add_money_column(
@@ -53,18 +57,19 @@ fn list_all(args: &Arguments, tracker: &Tracker) {
             true,
         );
     }
-    if args.incomes {
-        table.add_money_list(&tracker.incomes, "Incomes", show_categories, false);
+    if show_incomes {
+        table.add_money_list(&tracker.incomes, "Incomes", args.show_categories, false);
     }
-    if args.expenses {
-        table.add_money_list(&tracker.expenses, "Expenses", show_categories, false);
+    if show_expenses {
+        table.add_money_list(&tracker.expenses, "Expenses", args.show_categories, false);
     }
     table.print();
 }
 
 fn list_detailed(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
     // prepare money lists
-    let lists: Vec<(&MoneyList, &Vec<MoneyChange>, &str)> = get_specified_lists(args, tracker)
+    let lists: Vec<(&MoneyList, &Vec<MoneyChange>, &str)> = tracker
+        .get_money_lists(&args.get_list_types_or_all())
         .iter()
         .map(|(l, n)| (l, l.entries().get(&year_month), n))
         .filter_map(|(l, o, n)| o.as_ref().map(|v| (*l, *v, *n)))
@@ -81,7 +86,7 @@ fn list_detailed(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
     table.key_prec = 3;
     let mut money_indices = Vec::<usize>::new();
     for (list, vec, name) in &lists {
-        money_indices.push(table.add_money_list(list, vec, name, args.wide.is_some()));
+        money_indices.push(table.add_money_list(list, vec, name, args.wide));
     }
     // print year and month
     println!("{} {}", year_month.month.name(), year_month.year);
@@ -113,7 +118,7 @@ fn list_detailed(args: &Arguments, tracker: &Tracker, year_month: YearMonth) {
 }
 
 pub fn list_categories(args: &Arguments, tracker: &Tracker) -> Result<(), String> {
-    let lists = get_specified_lists(args, tracker);
+    let lists = tracker.get_money_lists(&args.get_list_types_or_all());
     let max_num_categories = lists
         .iter()
         .map(|(l, _)| l.categories().len())
@@ -121,27 +126,13 @@ pub fn list_categories(args: &Arguments, tracker: &Tracker) -> Result<(), String
         .unwrap();
     let mut table = Table::with_num_rows(max_num_categories);
     for (list, name) in lists {
-        let width = CATEGORY_COL_WIDTH * if args.wide.is_some() { 2 } else { 1 };
+        let width = CATEGORY_COL_WIDTH * if args.wide { 2 } else { 1 };
         table.add_text_column(name, true, width, |i| {
             list.categories().get(*i).map(|c| "  ".to_owned() + &c.name)
         });
     }
     table.print();
     Ok(())
-}
-
-pub fn get_specified_lists<'a>(
-    args: &Arguments,
-    tracker: &'a Tracker,
-) -> Vec<(&'a MoneyList, &'static str)> {
-    [
-        (args.total, &tracker.total, "Total"),
-        (args.incomes, &tracker.incomes, "Incomes"),
-        (args.expenses, &tracker.expenses, "Expenses"),
-    ]
-    .iter()
-    .filter_map(|(a, l, n)| if *a { Some((*l, *n)) } else { None })
-    .collect::<Vec<_>>()
 }
 
 struct Table<'a, K>

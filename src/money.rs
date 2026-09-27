@@ -25,12 +25,27 @@ impl Tracker {
         }
     }
 
+    pub fn get_money_list(&self, list_type: MoneyListType) -> &MoneyList {
+        match list_type {
+            MoneyListType::Total => &self.total,
+            MoneyListType::Incomes => &self.incomes,
+            MoneyListType::Expenses => &self.expenses,
+        }
+    }
+
     pub fn get_mut_money_list(&mut self, list_type: MoneyListType) -> &mut MoneyList {
         match list_type {
             MoneyListType::Total => &mut self.total,
             MoneyListType::Incomes => &mut self.incomes,
             MoneyListType::Expenses => &mut self.expenses,
         }
+    }
+
+    pub fn get_money_lists(&self, list_types: &[MoneyListType]) -> Vec<(&MoneyList, &'static str)> {
+        list_types
+            .iter()
+            .map(|&t| (self.get_money_list(t), t.name()))
+            .collect::<Vec<_>>()
     }
 
     pub fn get_total_change(&self, year_month: &YearMonth) -> Money {
@@ -211,7 +226,7 @@ impl MoneyList {
         &self.entries
     }
 
-    pub fn entries_mut(&mut self) -> & mut HashMap<YearMonth, Vec<MoneyChange>> {
+    pub fn entries_mut(&mut self) -> &mut HashMap<YearMonth, Vec<MoneyChange>> {
         &mut self.entries
     }
 

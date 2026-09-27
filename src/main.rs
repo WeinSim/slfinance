@@ -64,11 +64,11 @@ fn run(args_raw: &[String]) -> Result<(), String> {
     let args = Arguments::parse(args_raw)?;
     // process arguments
     let mut run_command = true;
-    if args.help.is_some_and(|b| b) {
+    if args.help {
         print_help();
         run_command = false;
     }
-    if args.version.is_some_and(|b| b) {
+    if args.version {
         print_version();
         run_command = false;
     }
