@@ -225,6 +225,9 @@ impl Cell {
 impl RowKey<YearMonth> {
     pub fn from_year_months(year_months: &[YearMonth]) -> Vec<Self> {
         let mut row_keys: Vec<_> = year_months.iter().map(|ym| RowKey::Key(*ym)).collect();
+        if year_months.is_empty() {
+            return row_keys;
+        }
         let mut i: usize = 0;
         while i < row_keys.len() - 1 {
             // the let statement and the if statement are separate because we need a

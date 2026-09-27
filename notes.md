@@ -2,16 +2,7 @@
 
 ### Continue
 - Display / export graphs
-    - ascii
-    - Which format? (pdf, png, svg, html, ascii art)
-        - svg: probably best, since I an drawing the graph as individual shapes
-          anyways
-        - html: would probably just be a wrapper around the svg?
-        - pdf: also probably a wrapper around the svg
-        - png: since text will be involved (and i am not writing a text renderer
-          for this project), it would probably just be a render of the svg
-        - ascii art: perhaps as an alternative to svg. would fit the style since
-          it is a cli tool
+    - svg
 
 ### Features to add
 - slf edit

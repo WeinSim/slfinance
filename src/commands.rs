@@ -411,7 +411,7 @@ impl Command {
                 )?;
                 save_tracker(tracker)?;
             }
-            Self::Graph => graph(&load_tracker(args)?, &args)?,
+            Self::Graph => graph(&load_tracker(args)?, args)?,
             Self::ListCategories => list_categories(args, &load_tracker(args)?)?,
             Self::AddCategory(name) => {
                 let tracker = &mut load_tracker(args)?;
