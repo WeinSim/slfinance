@@ -488,11 +488,14 @@ impl<'a> Table<'a, usize> {
         // let min_desc_width = entries.iter().filter_map(|mc| mc.description.clone()).map(|d| d.len()).max().unwrap_or_default();
         // let col_width = usize::clamp(min_desc_width, "Description".len(), DESCRIPTION_COL_WIDTH);
         // only add a column for descriptions if any of the entries actually have a description
-        let add_desc_col = entries.iter().find(|mc| mc.description.is_some()).is_some();
+        let add_desc_col = entries
+            .iter()
+            .find(|mc| !mc.description.is_empty())
+            .is_some();
         if add_desc_col {
             let width = DESCRIPTION_COL_WIDTH * if wide { 2 } else { 1 };
             self.add_text_column("Description", false, width, |i| {
-                entries.get(*i).and_then(|mc| mc.description.clone())
+                entries.get(*i).map(|mc| mc.description.clone())
             });
         }
         money_index

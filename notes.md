@@ -3,21 +3,6 @@
 ### Continue
 
 ### Features to add
-- slf edit
-    - Specify an existing entry just like in slf remove (by index, default month
-      is the current month, default list is expenses)
-    - syntax: using already existing arguments, e.g. `slf edit 1 -d "new
-    description"`
-    - things to edit:
-        - set amount
-        - set / unset category
-        - set / unset description
-        - set / unset date
-            - need to move entry to the corresponding list if month / year
-            changes
-        - set year / month
-            - need to move entry, need to remove date
-            - is this really so important? when would this be useful?
 - Recurring incomes / expenses (rent, electricity, phone, etc.)
     - specify a json file (similar to tracker) of incomes and expenses (and i
       guess totals too), each with a description and category (if neccessary) to

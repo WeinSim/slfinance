@@ -89,23 +89,16 @@ impl MoneyList {
     }
 
     pub fn add_entry(&mut self, year_month: YearMonth, entry: MoneyChange) -> Result<(), String> {
-        if !self.allow_negatives && entry.amount.eval().is_negative() {
-            return Err("a 'total' value cannot be negative".to_owned());
-        }
+        self.check_non_negative(&entry.amount)?;
         if !self.allow_dates && entry.date.is_some() {
             return Err("a 'total' entry cannot have a date associated with it".to_owned());
         }
-        if let Some(date) = entry.date {
-            if date.month() != year_month.month.number_from_month() {
-                return Err(
-                    "given YearMonth does not match the month specified by 'entry'".to_owned(),
-                );
-            }
-            if date.year() != year_month.year {
-                return Err(
-                    "given YearMonth does not match the year specified by 'entry'".to_owned(),
-                );
-            }
+        if let Some(date) = entry.date
+            && !year_month.matches_date(&date)
+        {
+            return Err(format!(
+                "given month / year ({year_month}) does not match the given date ({date})"
+            ));
         }
         if let Some(i) = entry.category_id
             && i >= self.categories.len()
@@ -122,37 +115,99 @@ impl MoneyList {
         Ok(())
     }
 
-    pub fn remove_entry(&mut self, year_month: YearMonth, index: usize) -> Result<(), String> {
+    fn check_non_negative(&self, amount: &Expression) -> Result<(), String> {
+        if !self.allow_negatives && amount.eval().is_negative() {
+            Err("a 'total' value cannot be negative".to_owned())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn remove_entry(
+        &mut self,
+        year_month: YearMonth,
+        index: usize,
+    ) -> Result<MoneyChange, String> {
+        Ok(self.get_entries(year_month, index)?.remove(index))
+    }
+
+    pub fn set_entry_category(
+        &mut self,
+        year_month: YearMonth,
+        index: usize,
+        category: &str,
+    ) -> Result<(), String> {
+        let cat_id = if category.is_empty() {
+            None
+        } else {
+            Some(self.find_category_by_prefix(category)?)
+        };
+        self.get_entry(year_month, index)?.category_id = cat_id;
+        Ok(())
+    }
+
+    pub fn set_entry_description(
+        &mut self,
+        year_month: YearMonth,
+        index: usize,
+        description: String,
+    ) -> Result<(), String> {
+        self.get_entry(year_month, index)?.description = description;
+        Ok(())
+    }
+
+    pub fn set_entry_amount(
+        &mut self,
+        year_month: YearMonth,
+        index: usize,
+        amount: Expression,
+    ) -> Result<(), String> {
+        self.check_non_negative(&amount)?;
+        self.get_entry(year_month, index)?.amount = amount;
+        Ok(())
+    }
+
+    pub fn set_entry_date(
+        &mut self,
+        year_month: YearMonth,
+        index: usize,
+        date: Option<NaiveDate>,
+    ) -> Result<(), String> {
+        self.get_entry(year_month, index)?.date = date;
+        if let Some(d) = date
+            && !year_month.matches_date(&d)
+        {
+            let entry = self.remove_entry(year_month, index)?;
+            self.add_entry(YearMonth::from_naive_date(d), entry)?;
+        }
+        Ok(())
+    }
+
+    fn get_entry(
+        &mut self,
+        year_month: YearMonth,
+        index: usize,
+    ) -> Result<&mut MoneyChange, String> {
+        Ok(&mut self.get_entries(year_month, index)?[index])
+    }
+
+    fn get_entries(
+        &mut self,
+        year_month: YearMonth,
+        index: usize,
+    ) -> Result<&mut Vec<MoneyChange>, String> {
         let Some(entries) = self.entries.get_mut(&year_month) else {
             return Err(format!("no entries for {year_month}"));
         };
         if index < entries.len() {
-            entries.remove(index);
-            Ok(())
+            Ok(entries)
         } else {
             Err(format!(
-                "index out of range: index = {}, len = {}",
+                "entry index out of range: index = {}, len = {}",
                 index,
                 entries.len()
             ))
         }
-    }
-
-    pub fn sum(&self, year_month: &YearMonth) -> Money {
-        self.entries
-            .get(year_month)
-            .map_or_default(|v| v.iter().map(|mc| mc.amount.eval()).sum())
-    }
-
-    pub fn sum_category(&self, year_month: &YearMonth, category: usize) -> Money {
-        let Some(entries) = self.entries.get(year_month) else {
-            return Money::default();
-        };
-        entries
-            .iter()
-            .filter(|e| e.category_id.is_some_and(|i| i == category))
-            .map(|mc| mc.amount.eval())
-            .sum()
     }
 
     pub fn find_category(&self, name: &str) -> Option<usize> {
@@ -185,18 +240,6 @@ impl MoneyList {
         }
     }
 
-    // pub fn find_or_create_category(&mut self, name: &str) -> usize {
-    //     match self.find_category(name) {
-    //         Some(i) => i,
-    //         None => {
-    //             self.add_category(Category {
-    //                 name: name.to_owned(),
-    //             });
-    //             self.categories.len() - 1
-    //         }
-    //     }
-    // }
-
     pub fn add_category(&mut self, category: Category) -> Result<(), String> {
         if self.find_category(&category.name).is_some() {
             return Err(format!("category named '{}' already exists", category.name));
@@ -218,6 +261,29 @@ impl MoneyList {
         }
     }
 
+    pub fn sum(&self, year_month: &YearMonth) -> Money {
+        self.entries
+            .get(year_month)
+            .map_or_default(|v| v.iter().map(|mc| mc.amount.eval()).sum())
+    }
+
+    pub fn sum_category(&self, year_month: &YearMonth, category: usize) -> Money {
+        let Some(entries) = self.entries.get(year_month) else {
+            return Money::default();
+        };
+        entries
+            .iter()
+            .filter(|e| e.category_id.is_some_and(|i| i == category))
+            .map(|mc| mc.amount.eval())
+            .sum()
+    }
+
+    pub fn get_year_months(&self) -> Vec<YearMonth> {
+        let mut vec: Vec<YearMonth> = self.entries.keys().copied().collect();
+        vec.sort();
+        vec
+    }
+
     pub fn categories(&self) -> &Vec<Category> {
         &self.categories
     }
@@ -226,18 +292,8 @@ impl MoneyList {
         &self.entries
     }
 
-    pub fn entries_mut(&mut self) -> &mut HashMap<YearMonth, Vec<MoneyChange>> {
-        &mut self.entries
-    }
-
     pub fn allow_dates(&self) -> bool {
         self.allow_dates
-    }
-
-    pub fn get_year_months(&self) -> Vec<YearMonth> {
-        let mut vec: Vec<YearMonth> = self.entries.keys().copied().collect();
-        vec.sort();
-        vec
     }
 }
 
@@ -279,6 +335,10 @@ impl YearMonth {
             },
             month: self.month.pred(),
         }
+    }
+
+    pub fn matches_date(&self, date: &NaiveDate) -> bool {
+        date.month() == self.month.number_from_month() && date.year() == self.year
     }
 }
 
@@ -340,7 +400,7 @@ pub struct MoneyChange {
     pub amount: Expression,
     pub date: Option<NaiveDate>,
     pub category_id: Option<usize>,
-    pub description: Option<String>,
+    pub description: String,
 }
 
 impl PartialEq for MoneyChange {

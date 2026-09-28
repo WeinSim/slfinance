@@ -2,6 +2,7 @@ mod add;
 mod categories;
 mod convert;
 mod convert_back;
+mod edit;
 mod graph;
 mod list;
 mod remove;
@@ -15,6 +16,7 @@ use crate::{
         categories::{add_category, remove_category},
         convert::convert,
         convert_back::convert_back,
+        edit::edit,
         graph::graph,
         list::{list, list_categories},
         remove::remove,
@@ -113,6 +115,7 @@ pub struct Arguments {
     pub date: Option<Option<NaiveDate>>,
     pub month: Option<Month>,
     pub year: Option<i32>,
+    pub amount: Option<Expression>,
     pub wide: bool,
 }
 
@@ -203,19 +206,14 @@ impl Arguments {
                 Arg::Short('y') | Arg::Long("year") => {
                     Self::set_arg(&mut args.year, &mut iter, Self::parse_year, "year")?;
                 }
+                Arg::Short('a') | Arg::Long("amount") => {
+                    Self::set_arg(&mut args.amount, &mut iter, str::parse, "amount")?;
+                }
                 Arg::Short('w') | Arg::Long("wide") => args.wide = true,
                 Arg::Short(c) => return Err(format!("unknown argument: '-{c}'")),
                 Arg::Long(n) => return Err(format!("unknown argument: '--{n}'")),
                 Arg::Invalid(a) => return Err(format!("invalid argument: '{a}'")),
                 Arg::None => break,
-            }
-        }
-        if args.date.is_some() {
-            if args.month.is_some() {
-                return Err("conflicting arguments '--date' and '--month'".to_owned());
-            }
-            if args.year.is_some() {
-                return Err("conflicting arguments '--date' and '--year'".to_owned());
             }
         }
         Ok(args)
@@ -303,8 +301,8 @@ impl Arguments {
         if s == "." {
             return Ok(current_year);
         }
-        // if the input starts with a 0, we always return it as is
         let parsed = s.parse::<i32>().map_err(|e| e.to_string());
+        // if the input starts with a 0, we always return it as is
         if s.starts_with('0') {
             return parsed;
         }
@@ -321,6 +319,7 @@ impl Arguments {
 pub(crate) enum Command {
     List,
     Add(Expression),
+    Edit(usize),
     Remove(usize),
     Graph,
     ListCategories,
@@ -360,13 +359,21 @@ impl Parse for Command {
             match command {
                 "ls" | "list" => Ok(Self::List),
                 "a" | "add" => {
-                    let formula = iter.next().ok_or("expected formula")?.parse()?;
+                    let formula = iter.next().ok_or("missing <AMOUNT>")?.parse()?;
                     Ok(Self::Add(formula))
+                }
+                "e" | "edit" => {
+                    let index = iter
+                        .next()
+                        .ok_or("missing <INDEX>")?
+                        .parse::<usize>().map_err(|e| format!("unable to parse <INDEX>: {e}"))
+                        .map_err(|e| e.to_string())?;
+                    Ok(Self::Edit(index))
                 }
                 "rm" | "remove" => {
                     let index = iter
                         .next()
-                        .ok_or("expected index")?
+                        .ok_or("missing <INDEX>")?
                         .parse::<usize>()
                         .map_err(|e| e.to_string())?;
                     Ok(Self::Remove(index))
@@ -374,21 +381,21 @@ impl Parse for Command {
                 "g" | "graph" => Ok(Self::Graph),
                 "lsc" | "list-categories" => Ok(Self::ListCategories),
                 "ac" | "add-category" => {
-                    let category = iter.next().ok_or("expected category name")?.to_owned();
+                    let category = iter.next().ok_or("missing <CATEGORY>")?.to_owned();
                     Ok(Self::AddCategory(category))
                 }
                 "rmc" | "remove-category" => {
-                    let category = iter.next().ok_or("expected category name")?.to_owned();
+                    let category = iter.next().ok_or("missing <CATEGORY>")?.to_owned();
                     Ok(Self::RemoveCategory(category))
                 }
                 "help" => Ok(Self::Help),
                 "convert" => {
-                    let input_file = iter.next().ok_or("expected input file")?.to_owned();
-                    let output_file = iter.next().ok_or("expected output file")?.to_owned();
+                    let input_file = iter.next().ok_or("missing <INPUT_FILE>")?.to_owned();
+                    let output_file = iter.next().ok_or("missing <OUTPUT_FILE>")?.to_owned();
                     Ok(Self::Convert(input_file, output_file))
                 }
                 "convert-back" => {
-                    let output_file = iter.next().ok_or("expected output file")?.to_owned();
+                    let output_file = iter.next().ok_or("missing <OUTPUT_FILE>")?.to_owned();
                     let german = match iter.next() {
                         Some("english") => false,
                         Some("german") => true,
@@ -424,6 +431,11 @@ impl Command {
                 )?;
                 save_tracker(tracker)?;
             }
+            Self::Edit(index) => {
+                let tracker = &mut load_tracker(args)?;
+                edit(tracker, args, *index)?;
+                save_tracker(tracker)?;
+            }
             Self::Remove(index) => {
                 let tracker = &mut load_tracker(args)?;
                 let year_month = args
@@ -453,7 +465,7 @@ impl Command {
             Self::Help => print_help(),
             Self::Convert(input_file, output_file) => convert(input_file, output_file)?,
             Self::ConvertBack(output_file, german) => {
-                convert_back(&mut load_tracker(args)?, output_file, *german)?
+                convert_back(&load_tracker(args)?, output_file, *german)?
             }
         }
         // save settings file

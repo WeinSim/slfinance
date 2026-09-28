@@ -29,7 +29,7 @@ pub fn add(
             amount: expression.clone(),
             date,
             category_id: cat_id,
-            description: args.description.clone(),
+            description: args.description.clone().unwrap_or_default(),
         },
     )
 }

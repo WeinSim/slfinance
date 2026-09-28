@@ -2,7 +2,7 @@ use std::fs;
 
 use crate::{
     expressions::{Expression, Sign, Term},
-    money::{Category, Money, MoneyChange, MoneyList, Tracker, YearMonth},
+    money::{Money, MoneyChange, MoneyList, Tracker, YearMonth},
 };
 
 const MONTH_NAMES_GERMAN: [&str; 12] = [
@@ -20,34 +20,7 @@ const MONTH_NAMES_GERMAN: [&str; 12] = [
     "Dezember",
 ];
 
-pub fn convert_back(tracker: &mut Tracker, output_file: &str, german: bool) -> Result<(), String> {
-    // first, make sure that all entries have a category by creating a "no-category" for entries
-    // without a category
-    for list in [
-        &mut tracker.total,
-        &mut tracker.incomes,
-        &mut tracker.expenses,
-    ] {
-        let empty_id = list.categories().len();
-        let mut used_empty = false;
-        for vec in list.entries_mut().values_mut() {
-            for mc in vec {
-                match mc.category_id {
-                    Some(_) => {}
-                    None => {
-                        used_empty = true;
-                        mc.category_id = Some(empty_id);
-                    }
-                }
-            }
-        }
-        // add this later because I cannot borrow list as mutable inside the for loop
-        if used_empty {
-            list.add_category(Category {
-                name: "[no category]".to_owned(),
-            })?;
-        }
-    }
+pub fn convert_back(tracker: &Tracker, output_file: &str, german: bool) -> Result<(), String> {
     let mut tsv: Vec<Vec<String>> = Vec::new();
     // first row is for category names
     tsv.push(vec!["".to_owned()]);
@@ -82,7 +55,14 @@ pub fn convert_back(tracker: &mut Tracker, output_file: &str, german: bool) -> R
     add_column(
         &mut tsv,
         "Unberücksichtigte Einnahmen / Ausgaben",
-        |i| format!("={0}{1}-{2}{1}", get_col_name(change_col), i + 2, get_col_name(change_col + 2)),
+        |i| {
+            format!(
+                "={0}{1}-{2}{1}",
+                get_col_name(change_col),
+                i + 2,
+                get_col_name(change_col + 2)
+            )
+        },
         year_months.len(),
     );
     let incomes_col = change_col + 3;
@@ -90,7 +70,14 @@ pub fn convert_back(tracker: &mut Tracker, output_file: &str, german: bool) -> R
     add_column(
         &mut tsv,
         "Einnahmen / Ausgaben ges.",
-        |i| format!("={0}{1}-{2}{1}", get_col_name(incomes_col), i + 2, get_col_name(expenses_col)),
+        |i| {
+            format!(
+                "={0}{1}-{2}{1}",
+                get_col_name(incomes_col),
+                i + 2,
+                get_col_name(expenses_col)
+            )
+        },
         year_months.len(),
     );
     add_list(
@@ -130,7 +117,12 @@ fn add_list(
     sum_name: &str,
     sum_first: bool,
 ) {
-    let num_cats = list.categories().len();
+    let add_empty_cat = list
+        .entries()
+        .values()
+        .flatten()
+        .any(|mc| mc.category_id.is_none());
+    let num_cats = list.categories().len() + if add_empty_cat { 1 } else { 0 };
     let start_col = tsv[1].len() + 1;
     if sum_first {
         add_sum_col(
@@ -141,6 +133,14 @@ fn add_list(
             year_months.len(),
         );
     }
+    for cat in list.categories() {
+        tsv[0].push(cat.name.to_owned());
+    }
+    if add_empty_cat {
+        tsv[0].push("[no category]".to_owned());
+    }
+    // TODO: compress this structure
+    // TODO: test that this actually works with [no category]!!!
     let empty_vec: Vec<MoneyChange> = Vec::new();
     let mut buckets: Vec<Vec<Vec<&Expression>>> =
         vec![vec![Vec::new(); num_cats]; year_months.len()];
@@ -149,9 +149,6 @@ fn add_list(
         for mc in entries {
             buckets[i][mc.category_id.unwrap_or(num_cats - 1)].push(&mc.amount);
         }
-    }
-    for cat in list.categories() {
-        tsv[0].push(cat.name.to_owned());
     }
     // let start_index = tsv[1].len();
     for (r, row) in buckets.iter().enumerate() {

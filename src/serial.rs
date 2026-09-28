@@ -83,7 +83,7 @@ impl SerialTracker {
                         amount: entry.amt.clone(),
                         category_id: entry.cat,
                         date: entry.date,
-                        description: entry.desc.clone(),
+                        description: entry.desc.clone().unwrap_or_default(),
                     },
                 )?;
             }
@@ -119,6 +119,9 @@ impl SerialTracker {
         let mut entries = money_list.entries().iter().collect::<Vec<_>>();
         entries.sort_by(|e1, e2| e1.0.cmp(e2.0));
         for (ym, entries) in entries {
+            if entries.is_empty() {
+                continue;
+            }
             serial_list.push(YearMonthEntry {
                 month: ym.month,
                 year: ym.year,
@@ -128,7 +131,11 @@ impl SerialTracker {
                         cat: mc.category_id,
                         amt: mc.amount.clone(),
                         date: mc.date,
-                        desc: mc.description.clone(),
+                        desc: if mc.description.is_empty() {
+                            None
+                        } else {
+                            Some(mc.description.clone())
+                        },
                     })
                     .collect(),
             })
