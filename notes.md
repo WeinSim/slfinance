@@ -1,12 +1,12 @@
 # SLFinance
 
 ### Continue
-
-### Features to add
 - Recurring incomes / expenses (rent, electricity, phone, etc.)
     - specify a json file (similar to tracker) of incomes and expenses (and i
       guess totals too), each with a description and category (if neccessary) to
       be inserted with a command like `slf import <filename>`
+
+### Features to add
 - slf list
     - For detailed display: if only one list type is given, show sums for
     individual categories in addition to final sum?
@@ -27,7 +27,8 @@
 ### Problems to fix
 - SerialTracker is 99% identical to Tracker. The only differences are that
   YearMonth is flattened and that fields have shorter names ("cat" instead of
-  "category" etc.).
+  "category" etc.). Also, Recurring (crate::commands::recurring) is quite
+  similar to SerialTracker.
 - Check that given aruments actually match the command
 
 ## Frontend

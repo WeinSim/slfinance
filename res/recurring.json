@@ -1,0 +1,39 @@
+{
+    "total": [
+        {
+            "amt": "100",
+            "cat": 0
+        },
+        {
+            "amt": "200",
+            "desc": "two hundred"
+        }
+    ],
+    "total_categories": [
+        "cash"
+    ],
+    "incomes": [
+        {
+            "amt": "40",
+            "day": -1
+        },
+        {
+            "amt": "50",
+            "day": 2
+        }
+    ],
+    "income_categories": [
+    ],
+    "expenses": [
+        {
+            "amt": "20",
+            "cat": 0
+        },
+        {
+            "amt": "70"
+        }
+    ],
+    "expense_categories": [
+        "rent"
+    ]
+}

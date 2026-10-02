@@ -4,6 +4,7 @@ mod convert;
 mod convert_back;
 mod edit;
 mod graph;
+mod import;
 mod list;
 mod remove;
 
@@ -18,6 +19,7 @@ use crate::{
         convert_back::convert_back,
         edit::edit,
         graph::graph,
+        import::import,
         list::{list, list_categories},
         remove::remove,
     },
@@ -322,6 +324,7 @@ pub(crate) enum Command {
     Edit(usize),
     Remove(usize),
     Graph,
+    Import(String),
     ListCategories,
     AddCategory(String),
     RemoveCategory(String),
@@ -366,7 +369,8 @@ impl Parse for Command {
                     let index = iter
                         .next()
                         .ok_or("missing <INDEX>")?
-                        .parse::<usize>().map_err(|e| format!("unable to parse <INDEX>: {e}"))
+                        .parse::<usize>()
+                        .map_err(|e| format!("unable to parse <INDEX>: {e}"))
                         .map_err(|e| e.to_string())?;
                     Ok(Self::Edit(index))
                 }
@@ -379,6 +383,10 @@ impl Parse for Command {
                     Ok(Self::Remove(index))
                 }
                 "g" | "graph" => Ok(Self::Graph),
+                "i" | "import" => {
+                    let input_file = iter.next().ok_or("missing <INPUT_FILE>")?.to_owned();
+                    Ok(Self::Import(input_file))
+                }
                 "lsc" | "list-categories" => Ok(Self::ListCategories),
                 "ac" | "add-category" => {
                     let category = iter.next().ok_or("missing <CATEGORY>")?.to_owned();
@@ -451,6 +459,14 @@ impl Command {
                 save_tracker(tracker)?;
             }
             Self::Graph => graph(&load_tracker(args)?, args)?,
+            Self::Import(input_file) => {
+                let mut tracker = load_tracker(args)?;
+                let year_month = args
+                    .get_year_month()
+                    .unwrap_or(YearMonth::from_naive_date(*TODAY));
+                import(&mut tracker, input_file, year_month)?;
+                save_tracker(&tracker)?;
+            }
             Self::ListCategories => list_categories(args, &load_tracker(args)?)?,
             Self::AddCategory(name) => {
                 let tracker = &mut load_tracker(args)?;

@@ -32,6 +32,10 @@ Commands:
     g,   graph          Prints a graph of the specified lists (default is
                         total).
 
+    i,   import <INPUT_FILE>
+                        Inserts the specified template file into the given month
+                        (default is the current month).
+
     lsc, list-categories
                         Lists all categories of the specified list (default is
                         all lists).

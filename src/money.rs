@@ -337,6 +337,10 @@ impl YearMonth {
         }
     }
 
+    pub fn num_days(&self) -> Option<u8> {
+        self.month.num_days(self.year)
+    }
+
     pub fn matches_date(&self, date: &NaiveDate) -> bool {
         date.month() == self.month.number_from_month() && date.year() == self.year
     }

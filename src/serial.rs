@@ -1,3 +1,4 @@
+use crate::expressions::expr_serde;
 use std::fs;
 
 use chrono::{Month, NaiveDate};
@@ -143,25 +144,5 @@ impl SerialTracker {
         for category in money_list.categories() {
             categories.push(category.name.to_owned());
         }
-    }
-}
-
-mod expr_serde {
-    use crate::expressions::Expression;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(value: &Expression, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&value.to_string())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Expression, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        s.parse().map_err(serde::de::Error::custom)
     }
 }
