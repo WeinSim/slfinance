@@ -15,6 +15,7 @@
     - create a new tracker
 - slf edit-category
     - Change a category's name
+- Ability to change the order of categories
 - Display / export graphs
     - svg
 - Encrypted save files?
@@ -27,8 +28,7 @@
 ### Problems to fix
 - SerialTracker is 99% identical to Tracker. The only differences are that
   YearMonth is flattened and that fields have shorter names ("cat" instead of
-  "category" etc.). Also, Recurring (crate::commands::recurring) is quite
-  similar to SerialTracker.
+  "category" etc.). Also, Template is quite similar to SerialTracker.
 - Check that given aruments actually match the command
 
 ## Frontend

@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 
 use crate::{
     expressions::expr_serde,
@@ -58,11 +58,69 @@ pub fn import(
     Ok(())
 }
 
+pub fn export(tracker: &Tracker, output_file: &str, year_month: YearMonth) -> Result<(), String> {
+    let mut template = Template::default();
+    for (money_list, template_list, template_categories) in [
+        (
+            &tracker.total,
+            &mut template.total,
+            &mut template.total_categories,
+        ),
+        (
+            &tracker.incomes,
+            &mut template.incomes,
+            &mut template.income_categories,
+        ),
+        (
+            &tracker.expenses,
+            &mut template.expenses,
+            &mut template.expense_categories,
+        ),
+    ] {
+        let Some(entries) = money_list.entries().get(&year_month) else {
+            continue;
+        };
+        let mut categories: Vec<(usize, &str)> = Vec::new();
+        for mc in entries {
+            let cat_id = if let Some(cat_id) = mc.category_id {
+                if let Some(id) = categories.iter().position(|(i, _)| *i == cat_id) {
+                    Some(id)
+                } else {
+                    categories.push((cat_id, &money_list.categories()[cat_id].name));
+                    Some(categories.len() - 1)
+                }
+            } else {
+                None
+            };
+            let day = if let Some(date) = mc.date {
+                let day = date.day() as i32;
+                let month_len = year_month.num_days()? as i32;
+                if day > month_len - 5 {
+                    Some(-(month_len - day + 1))
+                } else {
+                    Some(day)
+                }
+            } else {
+                None
+            };
+            template_list.push(Entry {
+                amt: mc.amount.clone(),
+                cat: cat_id,
+                desc: if mc.description.is_empty() {
+                    None
+                } else {
+                    Some(mc.description.clone())
+                },
+                day,
+            });
+        }
+        *template_categories = categories.iter().map(|(_, c)| (*c).to_owned()).collect();
+    }
+    save_file(&template, output_file)
+}
+
 fn day_to_date(day: i32, year_month: YearMonth) -> Result<NaiveDate, String> {
-    let num_days = year_month
-        .num_days()
-        .ok_or_else(|| format!("year out of range: {}", year_month.year))?
-        as i32;
+    let num_days = year_month.num_days()? as i32;
     let d = match day {
         d if d < 0 && -num_days <= d => num_days + d + 1,
         d if d > 0 => d,
@@ -85,7 +143,13 @@ fn load_file(filename: &str) -> Result<Template, String> {
         .map_err(|e| format!("unable to parse file {filename}: {e}"))
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+fn save_file(template: &Template, filename: &str) -> Result<(), String> {
+    let json = serde_json::to_string::<Template>(template)
+        .map_err(|e| format!("unable to convert generated template to JSON: {e}"))?;
+    fs::write(filename, json).map_err(|e| format!("unable to write to file file {filename}: {e}"))
+}
+
+#[derive(Default, serde::Deserialize, serde::Serialize)]
 struct Template {
     total: Vec<Entry>,
     total_categories: Vec<String>,

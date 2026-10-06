@@ -4,7 +4,7 @@ mod convert;
 mod convert_back;
 mod edit;
 mod graph;
-mod import;
+mod import_export;
 mod list;
 mod remove;
 
@@ -19,7 +19,7 @@ use crate::{
         convert_back::convert_back,
         edit::edit,
         graph::graph,
-        import::import,
+        import_export::{export, import},
         list::{list, list_categories},
         remove::remove,
     },
@@ -325,6 +325,7 @@ pub(crate) enum Command {
     Remove(usize),
     Graph,
     Import(String),
+    Export(String),
     ListCategories,
     AddCategory(String),
     RemoveCategory(String),
@@ -386,6 +387,10 @@ impl Parse for Command {
                 "i" | "import" => {
                     let input_file = iter.next().ok_or("missing <INPUT_FILE>")?.to_owned();
                     Ok(Self::Import(input_file))
+                }
+                "ex" | "export" => {
+                    let output_file = iter.next().ok_or("missing <OUTPUT_FILE>")?.to_owned();
+                    Ok(Self::Export(output_file))
                 }
                 "lsc" | "list-categories" => Ok(Self::ListCategories),
                 "ac" | "add-category" => {
@@ -466,6 +471,13 @@ impl Command {
                     .unwrap_or(YearMonth::from_naive_date(*TODAY));
                 import(&mut tracker, input_file, year_month)?;
                 save_tracker(&tracker)?;
+            }
+            Self::Export(output_file) => {
+                let tracker = load_tracker(args)?;
+                let year_month = args
+                    .get_year_month()
+                    .unwrap_or(YearMonth::from_naive_date(*TODAY));
+                export(&tracker, output_file, year_month)?;
             }
             Self::ListCategories => list_categories(args, &load_tracker(args)?)?,
             Self::AddCategory(name) => {

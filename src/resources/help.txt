@@ -36,6 +36,10 @@ Commands:
                         Inserts the specified template file into the given month
                         (default is the current month).
 
+    ex,  export <OUTPUT_FILE>
+                        Takes all data from the specified month (default is the
+                        current month) and exports it as a template file.
+
     lsc, list-categories
                         Lists all categories of the specified list (default is
                         all lists).
